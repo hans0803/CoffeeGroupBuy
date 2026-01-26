@@ -5,9 +5,9 @@
 {% block content %}
 <section class="hero">
     <div class="hero-content">
-        <h1>咖啡團購</h1>
-        <p>各位又到了團購咖啡的時間啦</p>
-        <p>本次團購1/29中午12點收單喔</p>
+        <h1>{{ config.hero.title }}</h1>
+        <p>{{ config.hero.description }}</p>
+        <p>{{ config.hero.deadline_info }}</p>
     </div>
 </section>
 
@@ -158,17 +158,17 @@
     <div class="info-card">
         <h3>🛒 如何團購？</h3>
         <ol>
-            <li>瀏覽產品並加入購物車</li>
-            <li>前往購物車確認商品</li>
-            <li>輸入您的姓名並送出訂單</li>
+            {% for item in config.info.how_to_buy %}
+            <li>{{ item }}</li>
+            {% endfor %}
         </ol>
     </div>
     <div class="info-card">
         <h3>📋 注意事項</h3>
         <ul>
-            <li>更改數量或商品請至我的訂單查詢</li>
-            <li>確認購買數量請參考本期訂單統計</li>
-            <li>收單前要記得送出訂單</li>
+            {% for note in config.info.notes %}
+            <li>{{ note }}</li>
+            {% endfor %}
         </ul>
     </div>
 </section>
