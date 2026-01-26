@@ -1,0 +1,408 @@
+{% extends "base.html" %}
+
+{% block title %}{{ category_name }} - 咖啡團購{% endblock %}
+
+{% block content %}
+<section class="products-section">
+    <div class="section-header">
+        <h1>{{ category_name }}</h1>
+        <p>共 {{ products|length }} 項商品</p>
+    </div>
+
+    <div class="products-layout">
+        <button class="mobile-filter-toggle" onclick="toggleSidebar()">
+            🔍 篩選商品 (價格/烘焙度)
+        </button>
+
+        <!-- 側邊欄篩選 -->
+        <aside class="products-sidebar" id="filterSidebar">
+            {% if common_prices %}
+            <details class="filter-group" open>
+                <summary>
+                    <h3>快速價格選擇</h3>
+                </summary>
+                <div class="price-tags">
+                    {% for price in common_prices %}
+                    <a href="{{ url_for('products', category=category, min=price, max=price, roast=current_roast, processing=current_processing) }}"
+                        class="price-tag {% if current_min|int == price and current_max|int == price %}active{% endif %}">
+                        NT$ {{ price }}
+                    </a>
+                    {% endfor %}
+                </div>
+            </details>
+            {% endif %}
+
+            <details class="filter-group" open>
+                <summary>
+                    <h3>自訂價格範圍</h3>
+                </summary>
+                <form action="{{ url_for('products', category=category) }}" method="GET" class="price-range-form">
+                    {% if current_roast %}<input type="hidden" name="roast" value="{{ current_roast }}">{% endif %}
+                    {% if current_processing %}<input type="hidden" name="processing"
+                        value="{{ current_processing }}">{% endif %}
+                    <div class="range-inputs">
+                        <input type="number" name="min" placeholder="最低" value="{{ current_min }}" min="0">
+                        <span>-</span>
+                        <input type="number" name="max" placeholder="最高" value="{{ current_max }}" min="0">
+                    </div>
+                    <button type="submit" class="btn-filter">篩選</button>
+                    {% if current_min or current_max or current_roast or current_processing %}
+                    <a href="{{ url_for('products', category=category) }}" class="btn-reset">清除</a>
+                    {% endif %}
+                </form>
+            </details>
+
+            <!-- 烘焙度篩選 (Grouped) -->
+            <details class="filter-group" open>
+                <summary>
+                    <h3>烘焙度</h3>
+                </summary>
+                <div class="facet-list facet-grid">
+                    {% for key in ['light', 'medium', 'medium_dark', 'dark'] %}
+                    {% set group = roast_groups[key] %}
+                    <a href="{{ url_for('products', category=category, min=current_min, max=current_max, roast=key if current_roast != key else None, processing=current_processing) }}"
+                        class="facet-item {% if current_roast == key %}active{% endif %}">
+                        {{ group.label }}
+                    </a>
+                    {% endfor %}
+                </div>
+            </details>
+
+            {% if facets.processing %}
+            <details class="filter-group">
+                <summary>
+                    <h3>處理法</h3>
+                </summary>
+                <div class="facet-list">
+                    {% for p in facets.processing %}
+                    <a href="{{ url_for('products', category=category, min=current_min, max=current_max, roast=current_roast, processing=p if current_processing != p else None) }}"
+                        class="facet-item {% if current_processing == p %}active{% endif %}">
+                        {{ p }}
+                    </a>
+                    {% endfor %}
+                </div>
+            </details>
+            {% endif %}
+        </aside>
+
+        <!-- 產品列表 -->
+        <div class="products-grid">
+            {% for product in products %}
+            <div class="product-card" data-product-id="{{ product.id }}">
+                <div class="product-image">
+                    {% if product.image_url %}
+                    <img src="{{ product.image_url }}" alt="{{ product.name }}" loading="lazy">
+                    {% else %}
+                    <div class="no-image">☕</div>
+                    {% endif %}
+                </div>
+                <div class="product-info">
+                    <h3 class="product-name">
+                        <a href="{{ product.product_url }}" target="_blank" rel="noopener noreferrer">
+                            {{ product.name }} 🔗
+                        </a>
+                    </h3>
+                    <div class="product-price">
+                        <span class="current-price">NT$ {{ product.price }}</span>
+                        {% if product.original_price and product.original_price > product.price %}
+                        <span class="original-price">NT$ {{ product.original_price }}</span>
+                        {% endif %}
+                    </div>
+                    {% if product.purchase_count and product.purchase_count > 0 %}
+                    <div class="sales-info" style="font-size: 0.8rem; color: #888; margin-bottom: 0.5rem;">
+                        已售出 {{ product.purchase_count }}
+                    </div>
+                    {% endif %}
+                    <button class="add-to-cart-btn"
+                        onclick="addToCart('{{ product.id }}', '{{ product.name|e }}', {{ product.price }})">
+                        加入購物車
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {% if not products %}
+    <div class="empty-message">
+        <p>找不到符合條件的商品</p>
+        {% if current_min or current_max %}
+        <a href="{{ url_for('products', category=category) }}" class="btn-secondary">清除篩選條件</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</section>
+
+<style>
+    /* 佈局設定 */
+    .products-layout {
+        display: grid;
+        grid-template-columns: 250px 1fr;
+        gap: 2rem;
+        align-items: start;
+    }
+
+    /* 響應式：手機版變單欄 */
+    @media (max-width: 768px) {
+        .products-layout {
+            grid-template-columns: 1fr;
+        }
+
+        .products-sidebar {
+            display: none;
+            /* Mobile default hidden */
+            position: static;
+            max-height: none;
+            margin-bottom: 2rem;
+            animation: fadeIn 0.3s;
+        }
+
+        .products-sidebar.show {
+            display: block;
+        }
+
+        .mobile-filter-toggle {
+            display: block;
+            width: 100%;
+            padding: 0.8rem;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            color: #555;
+            font-weight: bold;
+            margin-bottom: 1rem;
+            cursor: pointer;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .mobile-filter-toggle::after {
+            content: ' ▼';
+            font-size: 0.8rem;
+        }
+
+        .mobile-filter-toggle.active {
+            background: #f8f9fa;
+            border-color: #5a3e2b;
+            color: #5a3e2b;
+        }
+
+        .mobile-filter-toggle.active::after {
+            content: ' ▲';
+        }
+    }
+
+    @media (min-width: 769px) {
+        .mobile-filter-toggle {
+            display: none;
+        }
+    }
+
+    /* 側邊欄樣式 */
+    .products-sidebar {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        position: sticky;
+        top: 100px;
+        /* 增加頂部距離，避免被 Header 遮擋 */
+        max-height: calc(100vh - 120px);
+        overflow-y: auto;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+
+    .filter-group {
+        margin-bottom: 2rem;
+    }
+
+    .filter-group summary {
+        list-style: none;
+        cursor: pointer;
+    }
+
+    .filter-group summary::-webkit-details-marker {
+        display: none;
+    }
+
+    .filter-group h3 {
+        font-size: 1.1rem;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #f0f0f0;
+        color: #333;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .filter-group h3::after {
+        content: '▼';
+        font-size: 0.8rem;
+        color: #999;
+        transition: transform 0.3s;
+    }
+
+    details:not([open]) .filter-group h3::after {
+        transform: rotate(-90deg);
+    }
+
+    /* 因為 h3 在 summary 內，CSS 選擇器修正 */
+    details[open] summary h3::after {
+        transform: rotate(0deg);
+    }
+
+    details:not([open]) summary h3::after {
+        transform: rotate(-90deg);
+    }
+
+    .price-range-form .range-inputs {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .price-range-form input {
+        width: 100%;
+        padding: 0.5rem;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        text-align: center;
+    }
+
+    .btn-filter,
+    .btn-reset {
+        display: block;
+        width: 100%;
+        text-align: center;
+        padding: 0.6rem;
+        border-radius: 4px;
+        border: none;
+        cursor: pointer;
+        font-size: 0.95rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .btn-filter {
+        background: #2c3e50;
+        color: white;
+    }
+
+    .btn-filter:hover {
+        background: #1a252f;
+    }
+
+    .btn-reset {
+        background: #f8f9fa;
+        border: 1px solid #ddd;
+        color: #666;
+        text-decoration: none;
+        box-sizing: border-box;
+    }
+
+    .btn-reset:hover {
+        background: #e2e6ea;
+    }
+
+    /* 快速選擇標籤 */
+    .price-tags {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
+    }
+
+    .price-tag {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        padding: 0.4rem 0.5rem;
+        /* 縮小高度 */
+        background: #f1f3f5;
+        color: #495057;
+        text-decoration: none;
+        border-radius: 8px;
+        /* 稍微方一點 */
+        font-size: 0.95rem;
+        transition: all 0.2s;
+        box-sizing: border-box;
+    }
+
+    .price-tag:hover {
+        background: #e9ecef;
+        transform: translateY(-1px);
+    }
+
+    .price-tag.active {
+        background: #007bff;
+        color: white;
+        box-shadow: 0 2px 4px rgba(0, 123, 255, 0.3);
+    }
+
+    /* 篩選項目列表 */
+    .facet-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .facet-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
+        width: 100%;
+    }
+
+    .facet-item {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 0.4rem 0.2rem;
+        background: white;
+        color: #333;
+        text-decoration: none;
+        border-radius: 6px;
+        transition: all 0.2s;
+        border: 1px solid #eee;
+        font-size: 0.9rem;
+    }
+
+    .facet-item:hover {
+        background: #f8f9fa;
+        border-color: #ddd;
+    }
+
+    .facet-item.active {
+        background: #e7f1ff;
+        color: #007bff;
+        border-color: #b8daff;
+        font-weight: 500;
+    }
+
+    /* 產品名稱連結 */
+    .product-name a {
+        color: #2c3e50;
+        text-decoration: none;
+        transition: color 0.2s;
+    }
+
+    .product-name a:hover {
+        color: #007bff;
+        text-decoration: underline;
+    }
+</style>
+{% endblock %}

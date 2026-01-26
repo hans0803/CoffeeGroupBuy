@@ -1,0 +1,433 @@
+{% extends "base.html" %}
+
+{% block title %}我的訂單查詢 - 咖啡團購{% endblock %}
+
+{% block content %}
+<section class="my-orders-section">
+    <h1>🔍 我的訂單查詢</h1>
+
+    <div class="search-container">
+        <form action="{{ url_for('my_orders') }}" method="GET" class="search-form">
+            <div class="form-group">
+                <label for="name">查詢訂單歸屬：</label>
+                <div class="input-group">
+                    <select id="name" name="name" required class="name-select">
+                        <option value="" disabled {% if not search_name %}selected{% endif %}>請選擇姓名...</option>
+                        {% for n in all_names %}
+                        <option value="{{ n }}" {% if n==search_name %}selected{% endif %}>{{ n }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="search-btn">🔍 查詢</button>
+                    {% if search_name %}
+                    <a href="{{ url_for('my_orders') }}" class="clear-btn">清除</a>
+                    {% endif %}
+                </div>
+            </div>
+        </form>
+    </div>
+
+    {% if search_name %}
+    {% if orders %}
+    <div class="orders-list">
+        <h2 style="text-align: center; color: #5a3e2b; margin-bottom: 2rem;">👤 {{ search_name }} 的歷史訂單</h2>
+
+        {% for order in orders %}
+        <div class="order-card" id="order-{{ order.id }}">
+            <div class="order-header">
+                <div class="header-left">
+                    <span class="order-time">📅 {{ order.created_at }}</span>
+                    <span class="order-id">#{{ order.id }}</span>
+                </div>
+                <div class="header-right">
+                    <button class="btn-delete-order" onclick="deleteOrder({{ order.id }})">
+                        🗑️ 刪除訂單
+                    </button>
+                </div>
+            </div>
+
+            <div class="order-items">
+                {% for item in order['items'] %}
+                <div class="order-item-row" id="item-{{ order.id }}-{{ loop.index }}">
+                    <div class="item-info">
+                        <span class="item-name">{{ item.name }}</span>
+                        <div class="item-meta">
+                            <span class="item-price">NT$ {{ item.price }}</span>
+                        </div>
+                    </div>
+                    <div class="item-controls">
+                        <button class="btn-qty"
+                            onclick="updateItem({{ order.id }}, '{{ item.name }}', {{ item.quantity - 1 }})">➖</button>
+                        <span class="item-qty">{{ item.quantity }}</span>
+                        <button class="btn-qty"
+                            onclick="updateItem({{ order.id }}, '{{ item.name }}', {{ item.quantity + 1 }})">➕</button>
+                    </div>
+                    <button class="btn-remove-item" onclick="updateItem({{ order.id }}, '{{ item.name }}', 0)"
+                        title="移除商品">
+                        🗑️
+                    </button>
+                    <div class="item-subtotal">
+                        NT$ {{ item.price * item.quantity }}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="order-footer">
+                <div class="order-total-label">總金額</div>
+                <div class="order-total-amount">NT$ {{ order.total }}</div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">📂</div>
+        <p>目前找不到「{{ search_name }}」的訂單記錄。</p>
+        <a href="{{ url_for('index') }}" class="btn-primary-link">前往選購商品</a>
+    </div>
+    {% endif %}
+    {% else %}
+    <div class="intro-placeholder">
+        <p>請從上方選單選擇姓名以查看訂單。</p>
+    </div>
+    {% endif %}
+</section>
+
+<script>
+    async function deleteOrder(orderId) {
+        if (!confirm('確定要刪除這筆訂單嗎？此動作無法復原。')) return;
+
+        try {
+            const response = await fetch('/api/orders/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ order_id: orderId })
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                // 移除該訂單卡片 with animation
+                const card = document.getElementById(`order-${orderId}`);
+                if (card) {
+                    card.style.transition = 'opacity 0.3s, transform 0.3s';
+                    card.style.opacity = '0';
+                    card.style.transform = 'scale(0.95)';
+                    setTimeout(() => {
+                        card.remove();
+                        if (document.querySelectorAll('.order-card').length === 0) {
+                            location.reload();
+                        }
+                    }, 300);
+                }
+            } else {
+                alert(data.message || '刪除失敗');
+            }
+        } catch (e) {
+            alert('發生錯誤: ' + e);
+        }
+    }
+
+    async function updateItem(orderId, productName, newQty) {
+        if (newQty < 0) return;
+        if (newQty === 0 && !confirm(`確定要刪除「${productName}」嗎？`)) return;
+
+        try {
+            const response = await fetch('/api/orders/update-item', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    order_id: orderId,
+                    product_name: productName,
+                    quantity: newQty
+                })
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                location.reload();
+            } else {
+                alert(data.message || '更新失敗');
+            }
+        } catch (e) {
+            alert('發生錯誤: ' + e);
+        }
+    }
+</script>
+
+<style>
+    .my-orders-section {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 3rem 1rem;
+    }
+
+    .my-orders-section h1 {
+        text-align: center;
+        color: #5a3e2b;
+        margin-bottom: 2rem;
+        font-size: 2rem;
+    }
+
+    .search-container {
+        background: white;
+        padding: 2rem;
+        border-radius: 16px;
+        box-shadow: 0 4px 20px rgba(90, 62, 43, 0.08);
+        /* Warm shadow */
+        margin-bottom: 3rem;
+        max-width: 600px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 0.8rem;
+        font-weight: 600;
+        color: #555;
+    }
+
+    .input-group {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+    }
+
+    .name-select {
+        flex: 1;
+        padding: 0 1rem;
+        height: 46px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        font-size: 1rem;
+        background-color: #fafafa;
+        cursor: pointer;
+        outline: none;
+        transition: border-color 0.2s;
+    }
+
+    .name-select:focus {
+        border-color: #c41e3a;
+        background: white;
+    }
+
+    .search-btn {
+        background: #5a3e2b;
+        color: white;
+        border: none;
+        padding: 0 1.5rem;
+        height: 46px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 1rem;
+        font-weight: 500;
+        transition: background 0.2s;
+        display: flex;
+        align-items: center;
+    }
+
+    .search-btn:hover {
+        background: #463020;
+    }
+
+    .clear-btn {
+        padding: 0 1rem;
+        color: #999;
+        text-decoration: none;
+        font-size: 0.9rem;
+    }
+
+    .clear-btn:hover {
+        color: #555;
+    }
+
+    /* Order Card Styling */
+    .order-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+        margin-bottom: 2rem;
+        overflow: hidden;
+        border: 1px solid #f0f0f0;
+        transition: transform 0.2s;
+    }
+
+    .order-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    }
+
+    .order-header {
+        background: linear-gradient(to right, #fdfbf9, #fff);
+        padding: 1.2rem;
+        border-bottom: 1px solid #eee;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .order-time {
+        color: #5a3e2b;
+        font-weight: 500;
+        margin-right: 10px;
+    }
+
+    .order-id {
+        background: #eee;
+        color: #777;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-family: monospace;
+    }
+
+    .btn-delete-order {
+        background: #fff;
+        color: #dc3545;
+        border: 1px solid #dc3545;
+        padding: 0.4rem 0.8rem;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.85rem;
+        transition: all 0.2s;
+    }
+
+    .btn-delete-order:hover {
+        background: #dc3545;
+        color: white;
+    }
+
+    .order-items {
+        padding: 0;
+    }
+
+    .order-item-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 1.2rem;
+        border-bottom: 1px solid #f9f9f9;
+    }
+
+    .order-item-row:last-child {
+        border-bottom: none;
+    }
+
+    .item-info {
+        flex: 2;
+        margin-right: 1rem;
+    }
+
+    .item-name {
+        display: block;
+        font-weight: 500;
+        color: #333;
+        margin-bottom: 4px;
+    }
+
+    .item-meta {
+        font-size: 0.85rem;
+        color: #888;
+    }
+
+    .item-controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: #f8f9fa;
+        padding: 4px;
+        border-radius: 6px;
+        margin-right: 1rem;
+    }
+
+    .btn-qty {
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        background: white;
+        border-radius: 4px;
+        cursor: pointer;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        font-size: 0.7rem;
+    }
+
+    .item-qty {
+        font-weight: bold;
+        min-width: 20px;
+        text-align: center;
+    }
+
+    .btn-remove-item {
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 1rem;
+        color: #ccc;
+        transition: color 0.2s;
+    }
+
+    .btn-remove-item:hover {
+        color: #dc3545;
+    }
+
+    .item-subtotal {
+        flex: 1;
+        text-align: right;
+        font-weight: 600;
+        color: #5a3e2b;
+        min-width: 80px;
+    }
+
+    .order-footer {
+        background: #fcfcfc;
+        padding: 1.2rem;
+        border-top: 1px solid #eee;
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .order-total-amount {
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: #c41e3a;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 4rem 1rem;
+        color: #888;
+    }
+
+    .empty-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+
+    .btn-primary-link {
+        display: inline-block;
+        margin-top: 1rem;
+        background: #5a3e2b;
+        color: white;
+        text-decoration: none;
+        padding: 0.8rem 1.5rem;
+        border-radius: 8px;
+        transition: background 0.2s;
+    }
+
+    .btn-primary-link:hover {
+        background: #463020;
+    }
+
+    .intro-placeholder {
+        text-align: center;
+        color: #999;
+        margin-top: 4rem;
+    }
+</style>
+{% endblock %}

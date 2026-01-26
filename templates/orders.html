@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+
+{% block title %}訂單統計 - 咖啡團購{% endblock %}
+
+{% block content %}
+<section class="orders-section">
+    <h1>📊 本期訂單統計</h1>
+
+    <!-- 本期銷售預覽看板 -->
+    {% if sales_stats %}
+    <div class="dashboard-panel" style="background: #f8f9fa; padding: 2rem; border-radius: 12px; margin-bottom: 3rem;">
+        <h2 style="text-align: center; color: #5a3e2b; margin-bottom: 2rem;">📈 本期銷售預覽</h2>
+
+        {% if sales_stats.top_products %}
+        <div class="dashboard-grid"
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 2rem;">
+            <!-- 左側：熱銷排行 -->
+            <div class="ranking-panel"
+                style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                <h3
+                    style="margin-bottom: 1rem; color: #c41e3a; border-bottom: 2px solid #eee; padding-bottom: 0.5rem; text-align: center;">
+                    🔥 熱銷商品 Top 10</h3>
+                <div class="ranking-list" style="max-height: 600px; overflow-y: auto;">
+                    {% for product in sales_stats.top_products[:10] %}
+                    <a href="{{ url_for('products', category=product.category) }}" class="ranking-item"
+                        style="display: flex; align-items: center; padding: 1rem 0.8rem; border-bottom: 1px solid #f0f0f0; text-decoration: none; color: inherit; transition: background 0.2s;">
+                        <span class="rank-badge"
+                            style="background: #5a3e2b; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 1rem; font-size: 0.8rem; flex-shrink: 0;">{{
+                            loop.index }}</span>
+                        <div class="rank-info" style="flex: 1;">
+                            <div class="rank-name" style="font-weight: 500; margin-bottom: 4px; color: #333;">{{
+                                product.name }}</div>
+                            <div class="rank-meta" style="font-size: 0.85rem; color: #666;">
+                                <span class="rank-price"
+                                    style="color: #c41e3a; font-weight: bold; margin-right: 8px;">NT$ {{ product.price
+                                    }}</span>
+                                <span class="rank-sales">已點 {{ product.purchase_count }}</span>
+                            </div>
+                        </div>
+                        <img src="{{ product.image_url }}" alt=""
+                            style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px; margin-left: 10px;">
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- 右側：圖表區 -->
+            <div class="charts-panel" style="display: flex; flex-direction: column; gap: 2rem;">
+                <!-- 甜甜圈圖 -->
+                <div class="chart-card"
+                    style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); flex: 1;">
+                    <h3 style="text-align: center; margin-bottom: 1rem; color: #495057; font-size: 1rem;">烘焙度偏好</h3>
+                    <div style="position: relative; height: 250px;">
+                        <canvas id="roastChartOrder"></canvas>
+                    </div>
+                </div>
+
+                <!-- 長條圖 -->
+                <div class="chart-card"
+                    style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); flex: 1;">
+                    <h3 style="text-align: center; margin-bottom: 1rem; color: #495057; font-size: 1rem;">價格帶銷量</h3>
+                    <div style="position: relative; height: 250px;">
+                        <canvas id="priceChartOrder"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Chart.js and Logic -->
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                // Data from backend
+                const roastStats = {{ sales_stats.roast_stats | tojson
+            }};
+            const priceStats = {{ sales_stats.price_stats | tojson }};
+
+            // 1. Roast Chart (Donut)
+            const roastCtx = document.getElementById('roastChartOrder').getContext('2d');
+
+            // Standard Roast Colors to match Index
+            const roastColors = {
+                "淺中": "#9e9e9e",
+                "中焙": "#8d6e63",
+                "中深": "#d7ccc8",
+                "深焙": "#3e2723",
+                "其他": "#4e342e",
+                "未分類": "#f5f5f5"
+            };
+            // Default colors if key not found
+            const defaultColors = ["#8d6e63", "#a1887f", "#bcaaa4", "#d7ccc8", "#efebe9"];
+
+            const roastLabels = Object.keys(roastStats);
+            const roastData = Object.values(roastStats);
+            const bgColors = roastLabels.map((label, i) => roastColors[label] || defaultColors[i % defaultColors.length]);
+
+            new Chart(roastCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: roastLabels,
+                    datasets: [{
+                        data: roastData,
+                        backgroundColor: bgColors,
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right' }
+                    }
+                }
+            });
+
+            // 2. Price Chart (Bar) - Exact Prices
+            const priceCtx = document.getElementById('priceChartOrder').getContext('2d');
+            const priceLabels = Object.keys(priceStats); // e.g., ["25", "70", "100"]
+            const priceData = Object.values(priceStats);
+
+            new Chart(priceCtx, {
+                type: 'bar',
+                data: {
+                    labels: priceLabels,
+                    datasets: [{
+                        label: '銷量',
+                        data: priceData,
+                        backgroundColor: '#c41e3a',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        });
+        </script>
+        {% else %}
+        <!-- Empty State Placeholder -->
+        <div class="dashboard-empty" style="text-align: center; padding: 4rem 1rem; color: #888;">
+            <div
+                style="font-size: 4rem; margin-bottom: 1rem; display: inline-block; animation: float 3s ease-in-out infinite;">
+                ☕</div>
+            <p style="font-size: 1.2rem; margin-bottom: 0.5rem; color: #5a3e2b; font-weight: 500;">目前還沒有產生數據哦！</p>
+            <p style="font-size: 0.95rem; color: #999;">快去「濾掛包」專區選購，讓這裡熱鬧起來～</p>
+            <style>
+                @keyframes float {
+                    0% {
+                        transform: translateY(0px);
+                    }
+
+                    50% {
+                        transform: translateY(-10px);
+                    }
+
+                    100% {
+                        transform: translateY(0px);
+                    }
+                }
+            </style>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <h1>📊 訂單總表</h1>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value">{{ stats.total_orders }}</div>
+            <div class="stat-label">總訂單數</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">NT$ {{ stats.total_amount }}</div>
+            <div class="stat-label">總金額</div>
+        </div>
+    </div>
+
+    {% if stats.user_stats %}
+    <div class="user-stats">
+        <h2>各使用者統計</h2>
+        <table class="stats-table">
+            <thead>
+                <tr>
+                    <th>姓名</th>
+                    <th>訂單數</th>
+                    <th>消費金額</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in stats.user_stats %}
+                <tr>
+                    <td>{{ user.customer_name }}</td>
+                    <td>{{ user.order_count }}</td>
+                    <td>NT$ {{ user.total_spent }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    {% if orders %}
+    <div class="orders-list">
+        <h2>訂單記錄</h2>
+        {% for order in orders %}
+        <div class="order-card">
+            <div class="order-header">
+                <span class="order-customer">{{ order.customer_name }}</span>
+                <span class="order-time">{{ order.created_at }}</span>
+                <span class="order-total">NT$ {{ order.total }}</span>
+            </div>
+            <div class="order-items">
+                {% for item in order['items'] %}
+                <div class="order-item-row">
+                    {{ item.name }} x{{ item.quantity }} = NT$ {{ item.price * item.quantity }}
+                </div>
+                {% endfor %}
+            </div>
+            {% if order.submitted_to_google %}
+            <span class="badge badge-success">已同步</span>
+            {% else %}
+            <span class="badge badge-pending">待同步</span>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-message">
+        <p>目前沒有訂單記錄</p>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

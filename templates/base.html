@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}咖啡團購{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="{{ url_for('index') }}" class="nav-brand">
+                ☕ 咖啡團購
+            </a>
+            <div class="nav-links">
+                <a href="{{ url_for('index') }}" class="nav-link">首頁</a>
+                <a href="{{ url_for('products', category='beans') }}" class="nav-link">咖啡豆</a>
+                <a href="{{ url_for('products', category='drip') }}" class="nav-link">濾掛包</a>
+                <a href="{{ url_for('products', category='giftbox') }}" class="nav-link">禮盒</a>
+                <a href="{{ url_for('orders_page') }}" class="nav-link">本期訂單統計</a>
+                <a href="{{ url_for('my_orders') }}" class="nav-link">我的訂單</a>
+            </div>
+            <a href="{{ url_for('cart') }}" class="cart-button">
+                🛒 購物車
+                <span class="cart-count" id="cart-count">{{ session.get('cart', {})|length }}</span>
+            </a>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="alert alert-{{ category }}">{{ message }}</div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <p>咖啡團購系統</p>
+            <p>
+                <a href="#" onclick="openFeedbackModal(); return false;">📝 匿名回饋</a>
+                <span style="margin: 0 10px; color: #ccc;">|</span>
+                產品資料來源：<a href="https://www.oklaocoffee.net" target="_blank">OKLAO 歐客佬官網</a>
+            </p>
+        </div>
+    </footer>
+
+    <!-- Feedback Modal -->
+    <div id="feedbackModal" class="feedback-modal">
+        <div class="feedback-content">
+            <span class="close-feedback" onclick="closeFeedbackModal()">&times;</span>
+            <h3>💬 意見回饋</h3>
+            <p style="color: #666; font-size: 0.9rem; margin-bottom: 1rem;">您的回饋將幫助我們改進服務（匿名發送）</p>
+            <textarea id="feedbackText" placeholder="請輸入您的建議..." rows="5"></textarea>
+            <button class="btn-submit-feedback" onclick="submitFeedback()">送出回饋</button>
+        </div>
+    </div>
+
+    <style>
+        .feedback-modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.2s;
+        }
+
+        .feedback-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 500px;
+            position: relative;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            text-align: center;
+        }
+
+        .close-feedback {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 1.5rem;
+            color: #999;
+            cursor: pointer;
+        }
+
+        .close-feedback:hover {
+            color: #333;
+        }
+
+        #feedbackText {
+            width: 100%;
+            padding: 1rem;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            resize: vertical;
+            font-size: 1rem;
+            box-sizing: border-box;
+        }
+
+        .btn-submit-feedback {
+            background: #5a3e2b;
+            color: white;
+            border: none;
+            padding: 0.8rem 2rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            width: 100%;
+        }
+
+        .btn-submit-feedback:hover {
+            background: #463020;
+        }
+    </style>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+    <script>
+        function openFeedbackModal() {
+            const modal = document.getElementById('feedbackModal');
+            modal.style.display = 'flex';
+            document.getElementById('feedbackText').focus();
+        }
+
+        function closeFeedbackModal() {
+            document.getElementById('feedbackModal').style.display = 'none';
+        }
+
+        // Click outside to close
+        window.onclick = function (event) {
+            const modal = document.getElementById('feedbackModal');
+            if (event.target == modal) {
+                closeFeedbackModal();
+            }
+        }
+
+        async function submitFeedback() {
+            const text = document.getElementById('feedbackText').value.trim();
+            if (!text) {
+                alert('請輸入內容');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/feedback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    alert('感謝您的回饋！');
+                    document.getElementById('feedbackText').value = '';
+                    closeFeedbackModal();
+                } else {
+                    alert(data.message || '傳送失敗');
+                }
+            } catch (e) {
+                alert('發生錯誤: ' + e);
+            }
+        }
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+
+</html>

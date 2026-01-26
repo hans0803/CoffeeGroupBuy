@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}咖啡團購 - 首頁{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <div class="hero-content">
+        <h1>咖啡團購</h1>
+        <p>各位又到了團購咖啡的時間啦</p>
+        <p>本次團購1/29中午12點收單喔</p>
+    </div>
+</section>
+
+<!-- 銷售統計儀表板 -->
+{% if stats and stats.top_products %}
+<section class="dashboard-section" style="padding: 2rem 0; background-color: #f8f9fa;">
+    <div class="container" style="max-width: 1200px; margin: 0 auto; padding: 0 1rem;">
+        <h2 class="section-title" style="text-align: center; margin-bottom: 2rem; color: #5a3e2b;">📈 歷史銷售統計看板</h2>
+
+        <div class="dashboard-grid"
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 2rem;">
+            <!-- 左側：熱銷排行 -->
+            <div class="ranking-panel"
+                style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                <h3
+                    style="margin-bottom: 1rem; color: #c41e3a; border-bottom: 2px solid #eee; padding-bottom: 0.5rem; text-align: center;">
+                    🔥 熱銷商品 Top 5</h3>
+                <div class="ranking-list" style="max-height: 800px; overflow-y: auto;">
+                    {% for product in stats.top_products[:5] %}
+                    <a href="{{ url_for('products', category=product.category) }}" class="ranking-item"
+                        style="display: flex; align-items: center; padding: 1.5rem 0.8rem; border-bottom: 1px solid #f0f0f0; text-decoration: none; color: inherit; transition: background 0.2s;">
+                        <span class="rank-badge"
+                            style="background: #5a3e2b; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 1rem; font-size: 0.8rem; flex-shrink: 0;">{{
+                            loop.index }}</span>
+                        {% if product.image_url %}
+                        <img src="{{ product.image_url }}" alt=""
+                            style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px; margin-right: 1rem;">
+                        {% else %}
+                        <div
+                            style="width: 50px; height: 50px; background: #eee; border-radius: 4px; margin-right: 1rem; display: flex; align-items: center; justify-content: center;">
+                            ☕</div>
+                        {% endif %}
+                        <div class="item-info" style="flex: 1; min-width: 0;">
+                            <div
+                                style="font-weight: bold; font-size: 0.95rem; margin-bottom: 0.2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                {{ product.name }}</div>
+                            <div style="font-size: 0.8rem; color: #666;">
+                                <span style="color: #c41e3a; font-weight: bold;">NT$ {{ product.price }}</span> | 已售出 {{
+                                product.purchase_count }}
+                            </div>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- 右側：圖表分析 -->
+            <div class="charts-panel" style="display: flex; flex-direction: column; gap: 1.5rem;">
+                <!-- 烘焙度分佈與價格帶並排 (如果空間夠) -->
+                <div class="chart-box"
+                    style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                    <h4 style="margin-bottom: 1rem; text-align: center; color: #555;">烘焙度偏好</h4>
+                    <div style="height: 200px; position: relative;">
+                        <canvas id="roastChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-box"
+                    style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                    <h4 style="margin-bottom: 1rem; text-align: center; color: #555;">價格帶銷量</h4>
+                    <div style="height: 200px; position: relative;">
+                        <canvas id="priceChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const roastStats = {{ stats.roast_stats | tojson
+    }};
+    const priceStats = {{ stats.price_stats | tojson }};
+
+    // 1. Roast Chart (Pie)
+    const ctxRoast = document.getElementById('roastChart').getContext('2d');
+    new Chart(ctxRoast, {
+        type: 'doughnut',
+        data: {
+            labels: Object.keys(roastStats),
+            datasets: [{
+                data: Object.values(roastStats),
+                backgroundColor: [
+                    '#d4a373', // 淺/黃金
+                    '#a98467', // 中
+                    '#6f4e37', // 中深
+                    '#2f1b0c', // 深
+                    '#999999'  // 其他
+                ],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'right' }
+            }
+        }
+    });
+
+    // 2. Price Chart (Bar)
+    const ctxPrice = document.getElementById('priceChart').getContext('2d');
+    new Chart(ctxPrice, {
+        type: 'bar',
+        data: {
+            labels: Object.keys(priceStats),
+            datasets: [{
+                label: '銷售數量',
+                data: Object.values(priceStats),
+                backgroundColor: '#c41e3a',
+                borderRadius: 4
+            }]
+        },
+        options: {
+            maintainAspectRatio: false,
+            scales: {
+                y: { beginAtZero: true, ticks: { stepSize: 1 } }
+            },
+            plugins: {
+                legend: { display: false }
+            }
+        }
+    });
+    });
+</script>
+{% endif %}
+
+<section class="categories-section">
+    <h2 class="section-title">選擇分類</h2>
+    <div class="category-grid">
+        {% for cat in categories %}
+        <a href="{{ url_for('products', category=cat.category) }}" class="category-card">
+            <div class="category-icon">
+                {% if cat.category == 'beans' %}🫘{% elif cat.category == 'drip' %}☕{% else %}🎁{% endif %}
+            </div>
+            <h3>{{ cat.category_name }}</h3>
+            <p class="product-count">{{ cat.count }} 項商品</p>
+        </a>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="info-section">
+    <div class="info-card">
+        <h3>🛒 如何團購？</h3>
+        <ol>
+            <li>瀏覽產品並加入購物車</li>
+            <li>前往購物車確認商品</li>
+            <li>輸入您的姓名並送出訂單</li>
+        </ol>
+    </div>
+    <div class="info-card">
+        <h3>📋 注意事項</h3>
+        <ul>
+            <li>更改數量或商品請至我的訂單查詢</li>
+            <li>確認購買數量請參考本期訂單統計</li>
+            <li>收單前要記得送出訂單</li>
+        </ul>
+    </div>
+</section>
+{% endblock %}

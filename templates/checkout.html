@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}結帳確認 - 咖啡團購{% endblock %}
+
+{% block content %}
+<section class="checkout-section">
+    <h1>📋 訂單確認</h1>
+
+    <div class="checkout-container">
+        <div class="order-summary">
+            <h2>訂單明細</h2>
+            <div class="order-items">
+                {% for item in cart_items %}
+                <div class="order-item">
+                    <span class="item-name">{{ item.name }}</span>
+                    <span class="item-qty">x{{ item.quantity }}</span>
+                    <span class="item-price">NT$ {{ item.price * item.quantity }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="order-total">
+                <span>總計</span>
+                <span>NT$ {{ total }}</span>
+            </div>
+        </div>
+
+        <form class="checkout-form" method="POST" action="{{ url_for('submit_order') }}">
+            <div class="form-group">
+                <label for="customer_name">購買者姓名</label>
+                <input type="text" id="customer_name" name="customer_name" placeholder="請輸入您的姓名" required>
+                <small>請輸入您的真實姓名，以便統計團購資料</small>
+            </div>
+
+            <button type="submit" class="submit-btn">確認送出訂單</button>
+        </form>
+    </div>
+</section>
+{% endblock %}

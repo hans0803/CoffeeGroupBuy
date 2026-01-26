@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment
+.env
+.venv
+env/
+venv/
+
+# Mac
+.DS_Store
+
+# Data & Database
+data/
+*.db
+*.sqlite
+*.xlsx
+*.json
+!config.json
+
+# Downloaded Images
+static/images/products/
+
+# IDEs
+.vscode/
+.idea/
+
+# Scripts
+push.sh
+*.sh
+!run_prod.sh
