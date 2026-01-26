@@ -30,7 +30,16 @@
 
 ## 🚀 快速開始
 
-### 0️⃣ 更新專案 (Git Pull)
+### 0️⃣ 首次安裝 (First Time Setup)
+
+若要在新電腦上使用，請先下載專案：
+
+```bash
+git clone https://github.com/hans0803/CoffeeGroupBuy.git
+cd CoffeeGroupBuy
+```
+
+### 🔄 更新專案 (Git Pull)
 
 若專案有更新（例如功能新增或修復），請先執行以下指令拉取最新程式碼：
 
