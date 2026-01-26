@@ -13,10 +13,12 @@ if %errorlevel% neq 0 (
 
 echo ==================================================
 echo 啟動 Waitress 伺服器 (Port 5001)
-echo 請訪問 http://localhost:5001
+echo 本機訪問: http://localhost:5001
+echo 區網訪問: 請使用下方 IPv4 位址
+ipconfig | findstr /R /C:"IPv4 Address" /C:"IP Address"
 echo 按 Ctrl+C 停止
 echo ==================================================
 
 :: 啟動伺服器
-waitress-serve --port=5001 src.app:app
+waitress-serve --host=0.0.0.0 --port=5001 src.app:app
 pause
