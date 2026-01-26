@@ -59,6 +59,9 @@ sh run_prod.sh
 - 使用 Gunicorn 啟動 4 個工作程序 (Workers)
 - 大幅提升併發處理能力
 - 瀏覽器打開：`http://localhost:5001`
+- **區域網路分享**: 同事可透過 `http://<你的IP>:5001` 連線
+    - Mac 查詢 IP: `ipconfig getifaddr en0` (例如 `192.168.1.100`)
+    - Windows 查詢 IP: `ipconfig`
 
 ### 3️⃣ 收單 - 匯出並清空
 
