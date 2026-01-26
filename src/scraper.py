@@ -221,7 +221,24 @@ def scrape_category_page(category_key: str, page: int = 1, limit: int = 24) -> t
             image_url = ''
             if img_elem:
                 # 優先使用 data-src（lazy loading），否則用 src
-                image_url = img_elem.get('data-src') or img_elem.get('src') or ''
+                image_url = img_elem.get('data-src') or img_elem.get('src')
+                
+                # 如果都沒有，嘗試 parsing data-srcset
+                if not image_url and img_elem.get('data-srcset'):
+                    try:
+                        # data-srcset 格式: "url1 375w, url2 540w, ..."
+                        # 取最後一個（通常是最高解析度），然後取該項目的 URL 部分 (split by space taking first part)
+                        srcset = img_elem.get('data-srcset')
+                        last_candidate = srcset.split(',')[-1].strip()
+                        image_url = last_candidate.split(' ')[0]
+                        # 移除可能的 query string 以確保副檔名判斷正確 (雖然後面有處理，但這裡是為了乾淨)
+                        if '?' in image_url:
+                            image_url = image_url.split('?')[0]
+                    except Exception:
+                        pass
+                
+                image_url = image_url or ''
+                
                 if image_url and not image_url.startswith('http'):
                     image_url = f"{BASE_URL}{image_url}"
 

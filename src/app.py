@@ -53,11 +53,24 @@ def load_site_config():
         print(f"Error loading config: {e}")
     return default_config
 
+@app.context_processor
+def inject_config():
+    """注入全域設定到所有模板"""
+    return dict(config=load_site_config())
+
 @app.route('/')
 def index():
     """首頁 - 顯示分類"""
     categories = get_categories()
     site_config = load_site_config()
+    
+    # 過濾分類
+    if 'special_events' in site_config:
+        new_year_cfg = site_config['special_events'].get('new_year_giftbox', {})
+        if not new_year_cfg.get('enabled', False):
+             # 如果未啟用，從列表中移除
+             key_to_remove = new_year_cfg.get('category_key')
+             categories = [c for c in categories if c['category'] != key_to_remove]
     
     # 讀取銷售統計
     stats = {}

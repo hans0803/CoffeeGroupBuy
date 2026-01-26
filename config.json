@@ -15,5 +15,13 @@
       "確認購買數量請參考本期訂單統計",
       "收單前要記得送出訂單"
     ]
+  },
+  "special_events": {
+    "new_year_giftbox": {
+      "enabled": true,
+      "category_key": "giftbox_newyear",
+      "name": "🧧 新春禮盒",
+      "url": "/products/giftbox_newyear"
+    }
   }
 }

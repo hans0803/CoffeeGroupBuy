@@ -21,6 +21,11 @@
                 <a href="{{ url_for('products', category='beans') }}" class="nav-link">咖啡豆</a>
                 <a href="{{ url_for('products', category='drip') }}" class="nav-link">濾掛包</a>
                 <a href="{{ url_for('products', category='giftbox') }}" class="nav-link">禮盒</a>
+                {% if config.special_events and config.special_events.new_year_giftbox.enabled %}
+                <a href="{{ url_for('products', category=config.special_events.new_year_giftbox.category_key) }}"
+                    class="nav-link" style="color: #ffecc2; font-weight: bold;">{{
+                    config.special_events.new_year_giftbox.name }}</a>
+                {% endif %}
                 <a href="{{ url_for('orders_page') }}" class="nav-link">本期訂單統計</a>
                 <a href="{{ url_for('my_orders') }}" class="nav-link">我的訂單</a>
             </div>
