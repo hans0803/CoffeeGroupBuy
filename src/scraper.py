@@ -231,9 +231,6 @@ def scrape_category_page(category_key: str, page: int = 1, limit: int = 24) -> t
                         srcset = img_elem.get('data-srcset')
                         last_candidate = srcset.split(',')[-1].strip()
                         image_url = last_candidate.split(' ')[0]
-                        # 移除可能的 query string 以確保副檔名判斷正確 (雖然後面有處理，但這裡是為了乾淨)
-                        if '?' in image_url:
-                            image_url = image_url.split('?')[0]
                     except Exception:
                         pass
                 
