@@ -27,13 +27,15 @@ IMAGES_DIR = os.path.join(BASE_DIR, 'static', 'images', 'products')
 CATEGORIES = {
     "beans": "/categories/coffeebean-%E5%92%96%E5%95%A1%E8%B1%86%E8%B2%B72%E9%80%811",
     "drip": "/categories/oklaoalldripcoffee",
-    "giftbox": "/categories/oklao-drip-coffee-gift-box-%E4%BC%81%E6%A5%AD%E9%80%81%E7%A6%AE-%E5%92%96%E5%95%A1%E7%A6%AE%E7%9B%92-%E4%BC%B4%E6%89%8B%E7%A6%AE"
+    "giftbox": "/categories/oklao-drip-coffee-gift-box-%E4%BC%81%E6%A5%AD%E9%80%81%E7%A6%AE-%E5%92%96%E5%95%A1%E7%A6%AE%E7%9B%92-%E4%BC%B4%E6%89%8B%E7%A6%AE",
+    "giftbox_newyear": "/pages/oklao-new-year-coffee-gift-box"
 }
 
 CATEGORY_NAMES = {
     "beans": "咖啡豆",
     "drip": "濾掛包",
-    "giftbox": "咖啡禮盒"
+    "giftbox": "咖啡禮盒",
+    "giftbox_newyear": "新春禮盒"
 }
 
 HEADERS = {
