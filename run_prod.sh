@@ -8,14 +8,17 @@ if ! command -v gunicorn &> /dev/null; then
     pip install gunicorn
 fi
 
+# 讀取 Config 中的 Port
+PORT=$(python3 -c "import json; print(json.load(open('config.json'))['server']['port'])")
+
 echo "=================================================="
-echo "啟動 Gunicorn 伺服器 (Port 5001, 4 Workers)"
-echo "請訪問 http://localhost:5001"
+echo "啟動 Gunicorn 伺服器 (Port $PORT, 4 Workers)"
+echo "請訪問 http://localhost:$PORT"
 echo "按 Ctrl+C 停止"
 echo "=================================================="
 
 # 啟動命令
 # -w 4: 4個工作進程 (適合處理並發)
-# -b 0.0.0.0:5001: 綁定所有IP的 5001 Port
+# -b 0.0.0.0:$PORT: 綁定所有IP的 $PORT Port
 # src.app:app: 指定 flask app 位置
-gunicorn -w 4 -b 0.0.0.0:5001 src.app:app
+gunicorn -w 4 -b 0.0.0.0:$PORT src.app:app

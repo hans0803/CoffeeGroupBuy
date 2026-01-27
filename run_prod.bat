@@ -11,14 +11,17 @@ if %errorlevel% neq 0 (
     pip install waitress
 )
 
+:: 讀取 Config 中的 Port
+for /f "tokens=*" %%i in ('python -c "import json; print(json.load(open('config.json'))['server']['port'])"') do set PORT=%%i
+
 echo ==================================================
-echo 啟動 Waitress 伺服器 (Port 5001)
-echo 本機訪問: http://localhost:5001
+echo 啟動 Waitress 伺服器 (Port %PORT%)
+echo 本機訪問: http://localhost:%PORT%
 echo 區網訪問: 請使用下方 IPv4 位址
 ipconfig | findstr /R /C:"IPv4 Address" /C:"IP Address"
 echo 按 Ctrl+C 停止
 echo ==================================================
 
 :: 啟動伺服器
-waitress-serve --host=0.0.0.0 --port=5001 src.app:app
+waitress-serve --host=0.0.0.0 --port=%PORT% src.app:app
 pause
