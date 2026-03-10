@@ -245,8 +245,9 @@ def scrape_category_page(category_key: str, page: int = 1, limit: int = 24) -> T
                 product_url = f"{BASE_URL}{product_url}"
 
             if product_id or name != '未知產品':
-                # 下載圖片到本地
-                local_image_path = download_image(image_url, product_id or sku or str(hash(name)))
+                # 在雲端部署中，我們直接使用遠端圖片網址，而不依賴本地的 static/images
+                # (保留下載邏輯以供本地備份)
+                download_image(image_url, product_id or sku or str(hash(name)))
 
                 # 解析屬性
                 roast = extract_roast(name)
@@ -258,7 +259,7 @@ def scrape_category_page(category_key: str, page: int = 1, limit: int = 24) -> T
                     name=name,
                     price=price,
                     original_price=original_price,
-                    image_url=local_image_path,
+                    image_url=image_url, # 直接使用遠端圖片
                     product_url=product_url,
                     category=category_key,
                     category_name=CATEGORY_NAMES.get(category_key, category_key),

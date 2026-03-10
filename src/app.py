@@ -14,7 +14,7 @@ from src.models import (
     get_order_statistics, mark_order_submitted, export_orders_to_xlsx,
     get_orders_by_customer, get_all_customer_names, delete_order, update_order_item,
     get_common_prices, get_product_facets, ROAST_GROUPS, update_sales_statistics,
-    get_current_sales_statistics, get_newest_products, add_review, get_reviews_by_product, get_all_product_review_stats
+    get_sales_statistics_dict, get_current_sales_statistics, get_newest_products, add_review, get_reviews_by_product, get_all_product_review_stats
 )
 from src.scraper import scrape_all_products, CATEGORY_NAMES
 from src.google_integration import submit_order_to_google
@@ -81,19 +81,12 @@ def index():
              key_to_remove = new_year_cfg.get('category_key')
              categories = [c for c in categories if c['category'] != key_to_remove]
     
-    # 讀取銷售統計
-    stats = {}
+    # 動態產生銷售統計 (從資料庫)，取代靜態的 statistics.json
     try:
-        json_path = os.path.join(BASE_DIR, 'data', 'statistics.json')
-        print(f"Loading stats from: {json_path}")
-        if os.path.exists(json_path):
-            with open(json_path, 'r', encoding='utf-8') as f:
-                stats = json.load(f)
-            print(f"Loaded stats with {len(stats.get('top_products', []))} top products")
-        else:
-            print(f"statistics.json not found at {json_path}")
+        stats = get_sales_statistics_dict()
     except Exception as e:
-        print(f"Error loading statistics.json: {e}")
+        print(f"Error generating sales statistics: {e}")
+        stats = {}
     
     # 如果沒有產品，提示重新爬取
     if not categories:

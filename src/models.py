@@ -327,8 +327,8 @@ def get_newest_products(days: int = 7) -> List[Dict]:
             
         return [row_to_dict(cursor, row) for row in rows]
 
-def update_sales_statistics():
-    """統計訂單，更新產品購買次數，並產生銷售統計數據 (統計 JSON)"""
+def get_sales_statistics_dict() -> dict:
+    """從資料庫收集目前所有購買統計，回傳字典格式 (支援 Vercel 動態讀取)"""
     with get_db() as conn:
         cursor = conn.cursor()
 
@@ -413,11 +413,20 @@ def update_sales_statistics():
         sorted_prices = sorted(price_exact.items(), key=lambda x: int(x[0]))
         stats["price_stats"] = dict(sorted_prices)
 
-        json_path = os.path.join(BASE_DIR, 'data', 'statistics.json')
+        return stats
+
+def update_sales_statistics():
+    """統計訂單，更新產品購買次數，並寫入銷售統計數據 (統計 JSON)。主要供本地/匯出使用。"""
+    stats = get_sales_statistics_dict()
+    
+    json_path = os.path.join(BASE_DIR, 'data', 'statistics.json')
+    try:
+        os.makedirs(os.path.dirname(json_path), exist_ok=True)
         with open(json_path, 'w', encoding='utf-8') as f:
             json.dump(stats, f, ensure_ascii=False, indent=2)
-
         print(f"已更新銷售統計，寫入 {json_path}")
+    except Exception as e:
+        print(f"寫入銷售統計失敗 (若在 Vercel 是正常的): {e}")
 
 
 def get_common_prices(category: Optional[str] = None, limit: int = 12) -> List[int]:
