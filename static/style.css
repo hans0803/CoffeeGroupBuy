@@ -1236,13 +1236,19 @@ img {
         background: white;
         border-radius: 16px 16px 0 0;
         box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.15);
-        transform: translateY(100%);
+        transform: translateY(105%);
+        /* Position completely off-screen */
         visibility: hidden;
         transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s linear 0.35s;
         overflow-y: auto;
         padding: 0 1.25rem 2rem 1.25rem !important;
         display: block !important;
         -webkit-overflow-scrolling: touch;
+    }
+
+    /* Prevent initial transition flicker */
+    .products-sidebar.no-transition {
+        transition: none !important;
     }
 
     .products-sidebar.open {

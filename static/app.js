@@ -299,6 +299,19 @@ function closeFilterSheet() {
     const sidebar = document.getElementById('filterSidebar');
     const overlay = document.getElementById('filterOverlay');
     if (sidebar) {
+        // 加入 no-transition 以防止初始化時的閃爍
+        sidebar.classList.add('no-transition');
+
+        // 初始化側邊欄
+        const savedState = localStorage.getItem('sidebarOpen');
+        if (savedState === 'true' && window.innerWidth > 768) {
+            sidebar.classList.add('open');
+        }
+
+        // 延遲後移除 no-transition，確保後續操作有動畫
+        setTimeout(() => {
+            sidebar.classList.remove('no-transition');
+        }, 100);
         sidebar.classList.remove('open');
         sidebar.style.transform = '';
     }
