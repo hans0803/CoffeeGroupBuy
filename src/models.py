@@ -332,28 +332,7 @@ def get_sales_statistics_dict() -> dict:
     with get_db() as conn:
         cursor = conn.cursor()
 
-        # 1. 統計所有訂單的商品數量
-        products_counts = defaultdict(int)
-
-        rows = db_execute(cursor, "SELECT items_json FROM orders", fetch='all')
-
-        for row in rows:
-            d = row_to_dict(cursor, row)
-            items_json = d['items_json']
-            try:
-                items = json.loads(items_json)
-                for item in items:
-                    name = item.get('name')
-                    qty = item.get('quantity', 0)
-                    if name and qty > 0:
-                        products_counts[name] += qty
-            except (json.JSONDecodeError, TypeError):
-                continue
-        
-        # 移除先前的更新資料庫(累加)邏輯，因為現在改為即時更新 purchase_count
-        conn.commit()
-
-        # 3. 產生統計數據 (從最新的 DB 狀態查詢)
+        # 直接從產品表的 purchase_count 產生統計數據 (累積統計)
         stats = {
             "top_products": [],
             "roast_stats": {},
