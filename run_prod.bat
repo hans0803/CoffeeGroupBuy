@@ -7,9 +7,11 @@ echo ==================================================
 :: 檢查是否安裝 waitress
 pip show waitress >nul 2>&1
 if %errorlevel% neq 0 (
-    echo 未偵測到 waitress，正在安裝...
-    pip install waitress
+    echo 未偵測到 waitress，準備安裝依賴套件...
 )
+
+echo 檢查並安裝所需的依賴套件 (requirements.txt)...
+pip install -r requirements.txt
 
 :: 讀取 Config 中的 Port
 for /f "tokens=*" %%i in ('python -c "import json; print(json.load(open('config.json'))['server']['port'])"') do set PORT=%%i

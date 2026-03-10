@@ -4,9 +4,11 @@
 
 # 檢查是否安裝 gunicorn
 if ! command -v gunicorn &> /dev/null; then
-    echo "未偵測到 gunicorn，正在安裝..."
-    pip install gunicorn
+    echo "未偵測到 gunicorn，準備安裝依賴套件..."
 fi
+
+echo "檢查並安裝所需的依賴套件 (requirements.txt)..."
+pip install -r requirements.txt
 
 # 讀取 Config 中的 Port
 PORT=$(python3 -c "import json; print(json.load(open('config.json'))['server']['port'])")
