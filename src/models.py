@@ -48,7 +48,7 @@ def ensure_data_dir():
 def get_db():
     """取得資料庫連線的 context manager (支援 SQLite 或 PostgreSQL)"""
     if IS_POSTGRES:
-        conn = psycopg2.connect(DATABASE_URL)
+        conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
         try:
             yield conn
         finally:
@@ -1012,8 +1012,7 @@ def delete_order(order_id: int) -> bool:
         db_execute(cursor, 'SELECT items_json FROM orders WHERE id = ?', (order_id,))
         row = cursor.fetchone()
         if row:
-            items_json = row['items_json'] if not IS_POSTGRES else row[0]
-            if isinstance(row, dict) and 'items_json' in row: items_json = row['items_json']
+            items_json = row['items_json']
             
             items = json.loads(items_json)
             for item in items:
@@ -1042,10 +1041,8 @@ def update_order_item(order_id: int, product_name: str, new_quantity: int) -> bo
         if not row:
             return False
 
-        items_json = row['items_json'] if not IS_POSTGRES else row[0]
-        if isinstance(row, dict) and 'items_json' in row: items_json = row['items_json']
-        current_total = row['total'] if not IS_POSTGRES else row[1]
-        if isinstance(row, dict) and 'total' in row: current_total = row['total']
+        items_json = row['items_json']
+        current_total = row['total']
         
         items = json.loads(items_json)
 
@@ -1209,9 +1206,9 @@ def get_all_product_review_stats() -> Dict[str, Dict]:
         
         stats = {}
         for row in rows:
-            p_id = row['product_id'] if not IS_POSTGRES else row[0]
-            avg = row['avg_rating'] if not IS_POSTGRES else row[1]
-            cnt = row['r_count'] if not IS_POSTGRES else row[2]
+            p_id = row['product_id']
+            avg = row['avg_rating']
+            cnt = row['r_count']
             
             # 安全轉換，避免 NoneType 錯誤
             stats[p_id] = {
