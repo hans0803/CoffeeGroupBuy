@@ -206,7 +206,7 @@ def save_products(products: List[Dict]):
                         processing=excluded.processing,
                         updated_at=excluded.updated_at
                 '''
-            cursor.execute(query, (
+            db_execute(cursor, query, (
                 p['id'], p['sku'], p['name'], p['price'], p.get('original_price'),
                 p['image_url'], p['product_url'], p['category'], p['category_name'],
                 p.get('roast'), p.get('processing'),
@@ -339,10 +339,11 @@ def update_sales_statistics():
         # 1. 統計所有訂單的商品數量
         products_counts = defaultdict(int)
 
-        cursor.execute("SELECT items_json FROM orders")
-        orders = cursor.fetchall()
+        rows = db_execute(cursor, "SELECT items_json FROM orders", fetch='all')
 
-        for (items_json,) in orders:
+        for row in rows:
+            d = row_to_dict(cursor, row)
+            items_json = d['items_json']
             try:
                 items = json.loads(items_json)
                 for item in items:
@@ -364,18 +365,17 @@ def update_sales_statistics():
         }
 
         # A. Top Sellers (Filter by 'drip' as requested)
-        cursor.execute('''
+        rows = db_execute(cursor, '''
             SELECT name, price, image_url, category, purchase_count, roast
             FROM products
             WHERE purchase_count > 0 AND category = 'drip'
             ORDER BY purchase_count DESC
             LIMIT 10
-        ''')
-        stats["top_products"] = [dict(row) for row in cursor.fetchall()]
+        ''', fetch='all')
+        stats["top_products"] = [row_to_dict(cursor, row) for row in rows]
 
         # B. Roast Stats (based on purchase_count, filtered by drip)
-        cursor.execute("SELECT roast, purchase_count FROM products WHERE purchase_count > 0 AND category = 'drip'")
-        roast_rows = cursor.fetchall()
+        roast_rows = db_execute(cursor, "SELECT roast, purchase_count FROM products WHERE purchase_count > 0 AND category = 'drip'", fetch='all')
 
         # 簡單映射烘焙度 (Align with ROAST_GROUPS)
         roast_counts = defaultdict(int)
@@ -399,13 +399,15 @@ def update_sales_statistics():
         stats["roast_stats"] = dict(roast_counts)
 
         # C. Price Stats (Exact Price Points, filtered by drip)
-        cursor.execute("SELECT price, purchase_count FROM products WHERE purchase_count > 0 AND category = 'drip'")
-        price_rows = cursor.fetchall()
+        price_rows = db_execute(cursor, "SELECT price, purchase_count FROM products WHERE purchase_count > 0 AND category = 'drip'", fetch='all')
 
         # 使用明確價格統計
         price_exact = defaultdict(int)
 
-        for price, count in price_rows:
+        for row in price_rows:
+            d = row_to_dict(cursor, row)
+            price = d['price']
+            count = d['purchase_count']
             price_exact[str(price)] += count
 
         # Sort by Price (Key) numerically
@@ -615,15 +617,14 @@ def create_order(customer_name: str, items: List[Dict], total: int) -> int:
                 VALUES (%s, %s, %s, %s) RETURNING id
             '''
             # In RealDictCursor, fetchone() returns a dict e.g. {'id': 1}
-            cursor.execute(query, (customer_name, items_json, total, now))
-            row = cursor.fetchone()
+            row = db_execute(cursor, query, (customer_name, items_json, total, now), fetch='one')
             order_id = row['id'] if isinstance(row, dict) else row[0]
         else:
             query = '''
                 INSERT INTO orders (customer_name, items_json, total, created_at)
                 VALUES (?, ?, ?, ?)
             '''
-            cursor.execute(query, (customer_name, items_json, total, now))
+            db_execute(cursor, query, (customer_name, items_json, total, now))
             order_id = cursor.lastrowid
         
         # 即時更新商品的已售出數量
@@ -784,10 +785,9 @@ def clear_orders() -> int:
     """清空所有訂單，回傳刪除數量"""
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute('SELECT COUNT(*) as count FROM orders')
-        row = cursor.fetchone()
+        row = db_execute(cursor, 'SELECT COUNT(*) as count FROM orders', fetch='one')
         count = row['count'] if row else 0
-        cursor.execute('DELETE FROM orders')
+        db_execute(cursor, 'DELETE FROM orders')
         conn.commit()
         print(f"已清空 {count} 筆訂單")
         return count
@@ -1078,9 +1078,9 @@ def update_order_item(order_id: int, product_name: str, new_quantity: int) -> bo
                 # 即時更新商品的已售出數量
                 if delta != 0:
                     if IS_POSTGRES:
-                        cursor.execute('UPDATE products SET purchase_count = GREATEST(0, COALESCE(purchase_count, 0) + %s) WHERE name = %s', (delta, product_name))
+                        db_execute(cursor, 'UPDATE products SET purchase_count = GREATEST(0, COALESCE(purchase_count, 0) + %s) WHERE name = %s', (delta, product_name))
                     else:
-                        cursor.execute('UPDATE products SET purchase_count = MAX(0, IFNULL(purchase_count, 0) + ?) WHERE name = ?', (delta, product_name))
+                        db_execute(cursor, 'UPDATE products SET purchase_count = MAX(0, IFNULL(purchase_count, 0) + ?) WHERE name = ?', (delta, product_name))
             else:
                 new_items.append(item)
                 new_total += item['price'] * item['quantity']
@@ -1118,15 +1118,14 @@ def add_review(product_id: str, reviewer_name: str, rating: int, comment: str = 
                 INSERT INTO reviews (product_id, reviewer_name, rating, comment, created_at)
                 VALUES (%s, %s, %s, %s, %s) RETURNING id
             '''
-            cursor.execute(query, (product_id, reviewer_name, rating, comment, now))
-            row = cursor.fetchone()
-            review_id = row['id']
+            row = db_execute(cursor, query, (product_id, reviewer_name, rating, comment, now), fetch='one')
+            review_id = row['id'] if isinstance(row, dict) else row[0]
         else:
             query = '''
                 INSERT INTO reviews (product_id, reviewer_name, rating, comment, created_at)
                 VALUES (?, ?, ?, ?, ?)
             '''
-            cursor.execute(query, (product_id, reviewer_name, rating, comment, now))
+            db_execute(cursor, query, (product_id, reviewer_name, rating, comment, now))
             review_id = cursor.lastrowid
             
         conn.commit()
@@ -1198,21 +1197,21 @@ def get_all_product_review_stats() -> Dict[str, Dict]:
         cursor = conn.cursor()
         
         if IS_POSTGRES:
-            cursor.execute('''
+            rows = db_execute(cursor, '''
                 SELECT product_id, 
                        ROUND(AVG(rating)::numeric, 1) as avg_rating, 
                        COUNT(*) as r_count
                 FROM reviews
                 GROUP BY product_id
-            ''')
+            ''', fetch='all')
         else:
-            cursor.execute('''
+            rows = db_execute(cursor, '''
                 SELECT product_id, 
                        ROUND(AVG(rating), 1) as avg_rating, 
                        COUNT(*) as r_count
                 FROM reviews
                 GROUP BY product_id
-            ''')
+            ''', fetch='all')
             
         rows = cursor.fetchall()
         
