@@ -283,9 +283,6 @@ function toggleSidebar() {
     const overlay = document.getElementById('filterOverlay');
     if (!sidebar) return;
 
-    // 第一次點選時立刻啟用動畫
-    sidebar.classList.add('has-transition');
-
     if (sidebar.classList.contains('open')) {
         closeFilterSheet();
     } else {
@@ -313,29 +310,30 @@ function initFilterSheet() {
     const sidebar = document.getElementById('filterSidebar');
     if (!sidebar) return;
 
-    // 初始化時先移除動畫，防止重新整理或點擊分頁時的彈跳閃爍
-    sidebar.classList.remove('has-transition');
-
-    // 在頁面穩定後才加上動畫類別 (延遲設為 400ms 確保初始渲染完全就緒)
-    setTimeout(() => {
-        sidebar.classList.add('has-transition');
-    }, 400);
+    // 添加一個快速關閉的 CSS class
+    if (!document.getElementById('no-transition-style')) {
+        const s = document.createElement('style');
+        s.id = 'no-transition-style';
+        s.textContent = '.no-transition { transition: none !important; }';
+        document.head.appendChild(s);
+    }
 
     // 監聽側邊欄內的所有點擊事件 (Event Delegation)
     sidebar.addEventListener('click', (e) => {
         const target = e.target;
-        // 如果點擊的是分類連結、分頁按鈕或篩選提交
-        if (target.closest('a') || target.closest('button[type="submit"]')) {
-            // 重要：切換頁面（重新整理）前，立刻關閉動畫，避免滑下去又滑上來的視覺干擾
-            sidebar.classList.remove('has-transition');
+        // 如果點擊的是篩選連結或按鈕 (排除 drag handle)
+        if (target.closest('a') || target.closest('button')) {
+            sidebar.classList.add('no-transition');
             closeFilterSheet();
+            // 在一小段時間後移除，確保下次開啟時仍有動畫 (雖然頁面通常會重整)
+            setTimeout(() => sidebar.classList.remove('no-transition'), 100);
         }
     });
 
-    // 監聽價格表單提交
+    // 監聽表單提交 (自訂價格範圍)
     sidebar.querySelectorAll('form').forEach(form => {
         form.addEventListener('submit', () => {
-            sidebar.classList.remove('has-transition');
+            sidebar.classList.add('no-transition');
             closeFilterSheet();
         });
     });
