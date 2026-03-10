@@ -1273,7 +1273,6 @@ img {
 
 /* --- 隱藏行動端篩選元件於桌面版 --- */
 .mobile-filter-toggle,
-.filter-overlay,
-.products-sidebar {
+.filter-overlay {
     display: none;
 }
