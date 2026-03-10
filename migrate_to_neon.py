@@ -30,6 +30,12 @@ def migrate():
         orders = sqlite_curr.fetchall()
         print(f"📦 Found {len(orders)} orders locally.")
         
+        for order in orders:
+            pg_curr.execute(
+                "INSERT INTO orders (customer_name, items_json, total, submitted_to_google, created_at) VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING",
+                (order['customer_name'], order['items_json'], order['total'], bool(order['submitted_to_google']), order['created_at'])
+            )
+
         # 3. Migrate Products (specifically purchase_count)
         sqlite_curr.execute("SELECT id, name, purchase_count FROM products WHERE purchase_count > 0")
         products = sqlite_curr.fetchall()
