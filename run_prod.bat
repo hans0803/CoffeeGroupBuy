@@ -14,7 +14,7 @@ echo 檢查並安裝所需的依賴套件 (requirements.txt)...
 pip install -r requirements.txt
 
 :: 讀取 Config 中的 Port
-for /f "tokens=*" %%i in ('python -c "import json; print(json.load(open('config.json'))['server']['port'])"') do set PORT=%%i
+for /f "tokens=*" %%i in ('python -c "import json; print(json.load(open('config.json', encoding='utf-8'))['server']['port'])"') do set PORT=%%i
 
 echo ==================================================
 echo 啟動 Waitress 伺服器 (Port %PORT%)

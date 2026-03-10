@@ -11,7 +11,7 @@ echo "檢查並安裝所需的依賴套件 (requirements.txt)..."
 pip install -r requirements.txt
 
 # 讀取 Config 中的 Port
-PORT=$(python3 -c "import json; print(json.load(open('config.json'))['server']['port'])")
+PORT=$(python3 -c "import json; print(json.load(open('config.json', encoding='utf-8'))['server']['port'])")
 
 echo "=================================================="
 echo "啟動 Gunicorn 伺服器 (Port $PORT, 4 Workers)"
