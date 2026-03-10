@@ -14,8 +14,8 @@
             🔍 篩選商品 (價格/烘焙度)
         </button>
 
-        <!-- 側邊欄篩選 -->
-        <aside class="products-sidebar" id="filterSidebar">
+        <!-- 側邊欄篩選 (加上 inline style 徹底封鎖渲染跳動) -->
+        <aside class="products-sidebar" id="filterSidebar" style="visibility: hidden; position: fixed;">
             <div class="filter-drag-handle"></div>
             {% if common_prices %}
             <details class="filter-group" open>
