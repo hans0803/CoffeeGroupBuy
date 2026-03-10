@@ -101,6 +101,9 @@ def index():
 @app.route('/products/<category>')
 def products(category):
     """產品列表頁"""
+    if category == 'new':
+        return new_products()
+    
     # 取得篩選參數
     try:
         min_price = int(request.args.get('min', 0)) if request.args.get('min') else None
@@ -139,23 +142,37 @@ def products(category):
 @app.route('/products/new')
 def new_products():
     """本次新品頁面"""
-    product_list = get_newest_products()
+    # 取得篩選參數
+    try:
+        min_price = int(request.args.get('min', 0)) if request.args.get('min') else None
+        max_price = int(request.args.get('max', 0)) if request.args.get('max') else None
+    except ValueError:
+        min_price = None
+        max_price = None
+
+    roast = request.args.get('roast')
+    processing = request.args.get('processing')
+
+    product_list = get_newest_products(min_price=min_price, max_price=max_price, roast=roast, processing=processing)
     review_stats = get_all_product_review_stats()
     
     for product in product_list:
         product['review_stats'] = review_stats.get(product['id'], {'avg_rating': 0.0, 'review_count': 0})
         
+    common_prices = get_common_prices('new')
+    facets = get_product_facets('new')
+
     return render_template('products.html',
                           products=product_list,
                           category='new',
                           category_name='本次新品',
-                          common_prices=[], # 新品頁面暫時不顯示通用價格篩選
-                          facets={'roast': [], 'processing': []}, # 新品頁面暫時不顯示進階篩選
+                          common_prices=common_prices,
+                          facets=facets,
                           roast_groups=ROAST_GROUPS,
-                          current_min='',
-                          current_max='',
-                          current_roast='',
-                          current_processing='',
+                          current_min=request.args.get('min', ''),
+                          current_max=request.args.get('max', ''),
+                          current_roast=roast,
+                          current_processing=processing,
                           cart_keys=list(session.get('cart', {}).keys()))
 
 
