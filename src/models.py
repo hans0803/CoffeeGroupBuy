@@ -1005,8 +1005,7 @@ def get_all_customer_names() -> List[str]:
     """取得所有已下單的客戶姓名"""
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute('SELECT DISTINCT customer_name FROM orders ORDER BY customer_name')
-        rows = cursor.fetchall()
+        rows = db_execute(cursor, 'SELECT DISTINCT customer_name FROM orders ORDER BY customer_name', fetch='all')
         names = []
         for row in rows:
             d = row_to_dict(cursor, row)
@@ -1022,8 +1021,7 @@ def delete_order(order_id: int) -> bool:
     with get_db() as conn:
         cursor = conn.cursor()
         
-        db_execute(cursor, 'SELECT items_json FROM orders WHERE id = ?', (order_id,))
-        row = cursor.fetchone()
+        row = db_execute(cursor, 'SELECT items_json FROM orders WHERE id = ?', (order_id,), fetch='one')
         if row:
             items_json = row['items_json']
             
@@ -1033,9 +1031,9 @@ def delete_order(order_id: int) -> bool:
                 qty = item.get('quantity', 0)
                 if name and qty > 0:
                     if IS_POSTGRES:
-                        cursor.execute('UPDATE products SET purchase_count = GREATEST(0, COALESCE(purchase_count, 0) - %s) WHERE name = %s', (qty, name))
+                        db_execute(cursor, 'UPDATE products SET purchase_count = GREATEST(0, COALESCE(purchase_count, 0) - %s) WHERE name = %s', (qty, name))
                     else:
-                        cursor.execute('UPDATE products SET purchase_count = MAX(0, IFNULL(purchase_count, 0) - ?) WHERE name = ?', (qty, name))
+                        db_execute(cursor, 'UPDATE products SET purchase_count = MAX(0, IFNULL(purchase_count, 0) - ?) WHERE name = ?', (qty, name))
                     
         db_execute(cursor, 'DELETE FROM orders WHERE id = ?', (order_id,))
         conn.commit()
