@@ -22,7 +22,7 @@ IS_POSTGRES = bool(DATABASE_URL)
 
 if IS_POSTGRES:
     import psycopg2
-    from psycopg2.extras import DictCursor
+    import psycopg2.extras
 
 
 # UTC+8 時區
@@ -48,7 +48,9 @@ def ensure_data_dir():
 def get_db():
     """取得資料庫連線的 context manager (支援 SQLite 或 PostgreSQL)"""
     if IS_POSTGRES:
-        conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+        conn = psycopg2.connect(DATABASE_URL)
+        # Ensure cursors use RealDictCursor for dict-like row access
+        conn.cursor_factory = psycopg2.extras.RealDictCursor
         try:
             yield conn
         finally:
@@ -61,6 +63,18 @@ def get_db():
             yield conn
         finally:
             conn.close()
+
+def row_to_dict(cursor, row):
+    """將資料庫 row 轉換為 dict，相容多種驅動與 cursor 類型"""
+    if row is None: return None
+    if isinstance(row, dict): return dict(row)
+    try:
+        return dict(row)
+    except (TypeError, ValueError):
+        # Fallback for generic tuples if cursor description is available
+        if cursor and hasattr(cursor, 'description'):
+            return {desc[0]: val for desc, val in zip(cursor.description, row)}
+    return row
 
 def db_execute(cursor, query: str, params: tuple = (), fetch: str = None):
     """
@@ -587,7 +601,7 @@ def get_categories() -> List[Dict]:
             ORDER BY category
         ''')
         rows = cursor.fetchall()
-        return [dict(row) for row in rows]
+        return [row_to_dict(cursor, row) for row in rows]
 
 
 def create_order(customer_name: str, items: List[Dict], total: int) -> int:
@@ -603,8 +617,10 @@ def create_order(customer_name: str, items: List[Dict], total: int) -> int:
                 INSERT INTO orders (customer_name, items_json, total, created_at)
                 VALUES (%s, %s, %s, %s) RETURNING id
             '''
+            # In RealDictCursor, fetchone() returns a dict e.g. {'id': 1}
             cursor.execute(query, (customer_name, items_json, total, now))
-            order_id = cursor.fetchone()[0]
+            row = cursor.fetchone()
+            order_id = row['id'] if isinstance(row, dict) else row[0]
         else:
             query = '''
                 INSERT INTO orders (customer_name, items_json, total, created_at)
@@ -674,12 +690,14 @@ def get_order_statistics() -> dict:
         cursor = conn.cursor()
 
         # 總訂單數
-        cursor.execute('SELECT COUNT(*) FROM orders')
-        total_orders = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) as count FROM orders')
+        row = cursor.fetchone()
+        total_orders = row['count'] if row else 0
 
         # 總金額
-        cursor.execute('SELECT SUM(total) FROM orders')
-        total_amount = cursor.fetchone()[0] or 0
+        cursor.execute('SELECT SUM(total) as total_amount FROM orders')
+        row = cursor.fetchone()
+        total_amount = (row['total_amount'] if row else 0) or 0
 
         # 各使用者統計
         cursor.execute('''
@@ -779,8 +797,9 @@ def clear_orders() -> int:
     """清空所有訂單，回傳刪除數量"""
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute('SELECT COUNT(*) FROM orders')
-        count = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) as count FROM orders')
+        row = cursor.fetchone()
+        count = row['count'] if row else 0
         cursor.execute('DELETE FROM orders')
         conn.commit()
         print(f"已清空 {count} 筆訂單")
@@ -1001,7 +1020,15 @@ def get_all_customer_names() -> List[str]:
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute('SELECT DISTINCT customer_name FROM orders ORDER BY customer_name')
-        return [row[0] for row in cursor.fetchall()]
+        rows = cursor.fetchall()
+        names = []
+        for row in rows:
+            d = row_to_dict(cursor, row)
+            if isinstance(d, dict) and 'customer_name' in d:
+                names.append(d['customer_name'])
+            else:
+                names.append(row[0]) # Fallback for flat tuples
+        return names
 
 
 def delete_order(order_id: int) -> bool:
@@ -1108,7 +1135,8 @@ def add_review(product_id: str, reviewer_name: str, rating: int, comment: str = 
                 VALUES (%s, %s, %s, %s, %s) RETURNING id
             '''
             cursor.execute(query, (product_id, reviewer_name, rating, comment, now))
-            review_id = cursor.fetchone()[0]
+            row = cursor.fetchone()
+            review_id = row['id']
         else:
             query = '''
                 INSERT INTO reviews (product_id, reviewer_name, rating, comment, created_at)
@@ -1138,7 +1166,7 @@ def get_reviews_by_product(product_id: str) -> List[Dict]:
         rows = cursor.fetchall()
         reviews = []
         for row in rows:
-            r = dict(row) if not IS_POSTGRES else {k: v for k, v in zip([desc[0] for desc in cursor.description], row)}
+            r = row_to_dict(cursor, row)
             if r.get('comment') is None:
                 r['comment'] = ""
             reviews.append(r)
@@ -1164,8 +1192,8 @@ def get_product_review_stats(product_id: str) -> dict:
             ''', (product_id,))
         row = cursor.fetchone()
         
-        avg = row['avg_rating'] if not IS_POSTGRES else (row[0] if row else 0.0)
-        count = row['review_count'] if not IS_POSTGRES else (row[1] if row else 0)
+        avg = row['avg_rating'] if row else 0.0
+        count = row['review_count'] if row else 0
 
         avg = float(avg) if avg is not None else 0.0
         count = int(count) if count is not None else 0
