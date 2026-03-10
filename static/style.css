@@ -1236,9 +1236,9 @@ img {
         background: white;
         border-radius: 16px 16px 0 0;
         box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.15);
-        transform: translateY(100%);
+        transform: translateY(105%);
         visibility: hidden;
-        transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s linear 0.35s;
+        /* Default state has NO transition to prevent flicker on load/reload */
         overflow-y: auto;
         padding: 0 1.25rem 2rem 1.25rem !important;
         display: block !important;
@@ -1248,7 +1248,15 @@ img {
     .products-sidebar.open {
         transform: translateY(0) !important;
         visibility: visible;
+    }
+
+    /* Transition only active when this class is present (managed by JS) */
+    .products-sidebar.has-transition {
         transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s linear 0s;
+    }
+
+    .products-sidebar.has-transition:not(.open) {
+        transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s linear 0.35s;
     }
 
     .filter-drag-handle {
