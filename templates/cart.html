@@ -47,6 +47,12 @@
             <a href="{{ url_for('checkout') }}" class="checkout-btn">前往結帳</a>
         </div>
     </div>
+
+    <!-- 行動端懸浮結帳條 -->
+    <div class="mobile-checkout-bar">
+        <span class="mobile-checkout-total">總計 NT$ {{ total }}</span>
+        <a href="{{ url_for('checkout') }}" class="mobile-checkout-btn">前往結帳</a>
+    </div>
     {% else %}
     <div class="empty-cart">
         <p>購物車是空的</p>

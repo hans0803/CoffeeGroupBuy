@@ -16,6 +16,7 @@
 
         <!-- 側邊欄篩選 -->
         <aside class="products-sidebar" id="filterSidebar">
+            <div class="filter-drag-handle"></div>
             {% if common_prices %}
             <details class="filter-group" open>
                 <summary>
@@ -108,15 +109,32 @@
                         <span class="original-price">NT$ {{ product.original_price }}</span>
                         {% endif %}
                     </div>
-                    {% if product.purchase_count and product.purchase_count > 0 %}
-                    <div class="sales-info" style="font-size: 0.8rem; color: #888; margin-bottom: 0.5rem;">
-                        已售出 {{ product.purchase_count }}
+                    <div class="product-stats"
+                        style="display: flex; justify-content: space-between; font-size: 0.85rem; color: #666; margin-bottom: 0.5rem; align-items: center;">
+                        <div class="sales-info">
+                            已售出 {{ product.purchase_count|default(0) }} 包
+                        </div>
+                        <div class="review-info" onclick="openReviewModal('{{ product.id }}', '{{ product.name|e }}')"
+                            style="cursor: pointer; color: #5a3e2b; display: flex; align-items: center; gap: 3px; background: #fff5e6; padding: 2px 8px; border-radius: 12px; border: 1px solid #ffecc2; transition: all 0.2s; font-weight: 500;"
+                            onmouseover="this.style.background='#ffecc2'" onmouseout="this.style.background='#fff5e6'">
+                            {% if product.review_stats and product.review_stats.review_count > 0 %}
+                            ⭐ {{ product.review_stats.avg_rating }} ({{ product.review_stats.review_count }})
+                            {% else %}
+                            💬 撰寫評論
+                            {% endif %}
+                        </div>
                     </div>
-                    {% endif %}
+                    {% if product.id in cart_keys %}
+                    <button class="add-to-cart-btn btn-in-cart" disabled
+                        style="background: #e2e8f0; color: #64748b; cursor: not-allowed; border: 1px solid #cbd5e1; box-shadow: none;">
+                        已在購物車
+                    </button>
+                    {% else %}
                     <button class="add-to-cart-btn"
-                        onclick="addToCart('{{ product.id }}', '{{ product.name|e }}', {{ product.price }})">
+                        onclick="addToCart('{{ product.id }}', '{{ product.name|e }}', {{ product.price }}, this)">
                         加入購物車
                     </button>
+                    {% endif %}
                 </div>
             </div>
             {% endfor %}

@@ -144,8 +144,7 @@
         {% for cat in categories %}
         <a href="{{ url_for('products', category=cat.category) }}" class="category-card">
             <div class="category-icon">
-                {% if cat.category == 'beans' %}🌰{% elif cat.category == 'drip' %}☕{% elif cat.category ==
-                'giftbox_newyear' %}🧧{% else %}🎁{% endif %}
+                {% if cat.category == 'beans' %}🌰{% elif cat.category == 'drip' %}☕{% else %}🎁{% endif %}
             </div>
             <h3>{{ cat.category_name }}</h3>
             <p class="product-count">{{ cat.count }} 項商品</p>

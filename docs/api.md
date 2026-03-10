@@ -86,6 +86,50 @@
 
 ---
 
+## ⭐ 商品評論 (Reviews)
+
+### 1. 取得商品評論
+- **URL**: `/api/products/<product_id>/reviews`
+- **Method**: `GET`
+- **描述**: 獲取特定商品的所有評論與平均分數。
+- **Response**:
+  ```json
+  {
+    "success": true,
+    "reviews": [
+      {
+        "reviewer_name": "匿名愛好者",
+        "rating": 5,
+        "comment": "非常好喝！",
+        "created_at": "2026-03-10 12:00:00"
+      }
+    ]
+  }
+  ```
+
+### 2. 新增商品評論
+- **URL**: `/api/products/<product_id>/reviews`
+- **Method**: `POST`
+- **Content-Type**: `application/json`
+- **描述**: 對特定商品提交新的星星評分與文字留言。
+- **Payload**:
+  ```json
+  {
+    "reviewer_name": "咖啡大師",
+    "rating": 4,
+    "comment": "風味獨特，但價格稍高。"
+  }
+  ```
+- **Response**:
+  ```json
+  {
+    "success": true,
+    "message": "評論已成功提交！"
+  }
+  ```
+
+---
+
 ## 💬 回饋系統 (Feedback)
 
 ### 1. 提交匿名回饋

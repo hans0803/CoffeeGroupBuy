@@ -14,7 +14,7 @@ from .models import (
     get_order_statistics, mark_order_submitted, export_orders_to_xlsx,
     get_orders_by_customer, get_all_customer_names, delete_order, update_order_item,
     get_common_prices, get_product_facets, ROAST_GROUPS, update_sales_statistics,
-    get_current_sales_statistics
+    get_current_sales_statistics, get_newest_products, add_review, get_reviews_by_product, get_all_product_review_stats
 )
 from .scraper import scrape_all_products, CATEGORY_NAMES
 from .google_integration import submit_order_to_google
@@ -56,7 +56,16 @@ def load_site_config():
 @app.context_processor
 def inject_config():
     """注入全域設定到所有模板"""
-    return dict(config=load_site_config())
+    site_config = load_site_config()
+    
+    # 計算購物車商品總數
+    cart = session.get('cart', {})
+    cart_count = sum(item['quantity'] for item in cart.values())
+    
+    # 全局姓名選單供評論使用
+    all_names = get_all_customer_names()
+    
+    return dict(cart_count=cart_count, config=site_config, all_names=all_names)
 
 @app.route('/')
 def index():
@@ -90,7 +99,10 @@ def index():
     if not categories:
         flash('尚未載入產品資料，請點擊下方按鈕同步產品。', 'warning')
     
-    return render_template('index.html', categories=categories, stats=stats, config=site_config)
+    return render_template('index.html', 
+                          categories=categories, 
+                          stats=stats, 
+                          config=site_config)
 
 
 @app.route('/products/<category>')
@@ -109,6 +121,11 @@ def products(category):
 
     # 取得產品與統計
     product_list = get_all_products(category, min_price, max_price, roast, processing)
+    review_stats = get_all_product_review_stats()
+    
+    for product in product_list:
+        product['review_stats'] = review_stats.get(product['id'], {'avg_rating': 0.0, 'review_count': 0})
+        
     common_prices = get_common_prices(category)
     facets = get_product_facets(category)
     category_name = CATEGORY_NAMES.get(category, category)
@@ -123,7 +140,31 @@ def products(category):
                           current_min=request.args.get('min', ''),
                           current_max=request.args.get('max', ''),
                           current_roast=roast,
-                          current_processing=processing)
+                          current_processing=processing,
+                          cart_keys=list(session.get('cart', {}).keys()))
+
+@app.route('/products/new')
+def new_products():
+    """本次新品頁面"""
+    product_list = get_newest_products()
+    review_stats = get_all_product_review_stats()
+    
+    for product in product_list:
+        product['review_stats'] = review_stats.get(product['id'], {'avg_rating': 0.0, 'review_count': 0})
+        
+    return render_template('products.html',
+                          products=product_list,
+                          category='new',
+                          category_name='本次新品',
+                          common_prices=[], # 新品頁面暫時不顯示通用價格篩選
+                          facets={'roast': [], 'processing': []}, # 新品頁面暫時不顯示進階篩選
+                          roast_groups=ROAST_GROUPS,
+                          current_min='',
+                          current_max='',
+                          current_roast='',
+                          current_processing='',
+                          cart_keys=list(session.get('cart', {}).keys()))
+
 
 
 @app.route('/cart')
@@ -216,6 +257,12 @@ def submit_order():
     # 清空購物車
     session.pop('cart', None)
     
+    # 重新計算銷售統計 JSON (更新首頁看板)
+    try:
+        update_sales_statistics()
+    except Exception as e:
+        print(f"Error updating stats after order: {e}")
+
     flash(f'訂單已送出！感謝 {customer_name} 的訂購。', 'success')
     return redirect(url_for('index'))
 
@@ -399,6 +446,38 @@ def api_update_order_item():
             return jsonify({'success': False, 'message': '更新失敗'})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
+
+
+@app.route('/api/products/<product_id>/reviews', methods=['GET'])
+def api_get_reviews(product_id):
+    """取得商品的所有評論"""
+    try:
+        reviews = get_reviews_by_product(product_id)
+        return jsonify({'success': True, 'reviews': reviews})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+
+@app.route('/api/products/<product_id>/reviews', methods=['POST'])
+def api_post_review(product_id):
+    """送出商品評論"""
+    data = request.get_json()
+    reviewer_name = data.get('reviewer_name', '匿名').strip()
+    rating = data.get('rating')
+    comment = data.get('comment', '').strip()
+    
+    if not reviewer_name:
+        reviewer_name = '匿名'
+        
+    if not rating or not isinstance(rating, int) or rating < 1 or rating > 5:
+        return jsonify({'success': False, 'message': '請提供有效的星數評分 (1-5)'})
+        
+    try:
+        add_review(product_id, reviewer_name, rating, comment)
+        return jsonify({'success': True, 'message': '評論已送出'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'送出失敗: {str(e)}'})
+
 
 @app.route('/api/feedback', methods=['POST'])
 def api_feedback():

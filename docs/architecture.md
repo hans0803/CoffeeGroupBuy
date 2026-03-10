@@ -15,6 +15,9 @@
 - **樣式**: Vanilla CSS (CSS3, Flexbox, Grid)
 - **互動**: Vanilla JavaScript (ES6+, Fetch API)
 - **圖表**: Chart.js (用於銷售儀表板)
+- **UI Components**:
+  - **Bottom Navigation**: Sticky bottom bar for mobile (≤ 768px) replacing hamburger menus.
+  - **Bottom-Sheets**: Filter sidebars and review modals natively transform into swipe-dismissible bottom sheets on mobile.
 
 ### 爬蟲 (Scraper)
 - **工具**: Requests + BeautifulSoup4
@@ -62,6 +65,12 @@ coffee/
    - 建立多筆 `OrderItem` 紀錄
    - 清空購物車
    - **更新即時統計**: `get_current_sales_statistics` 隨之變動
+
+### 3. 商品評論流程 (Review Flow)
+1. 使用者在商品卡片點擊「撰寫評論」。
+2. 前端彈出 Modal 或 Bottom-Sheet 輸入 1-5 星評分與留言。
+3. 提交至 `POST /api/reviews/<product_id>`。
+4. 儲存於資料庫，前端即時更新該商品的平均星數與評論數量。
 
 ### 3. 即時儀表板 (Dashboard Flow)
 1. 訪問 `/orders`

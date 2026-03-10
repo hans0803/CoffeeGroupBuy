@@ -87,25 +87,50 @@ def init_db():
                 customer_name TEXT NOT NULL,
                 items_json TEXT NOT NULL,
                 total INTEGER NOT NULL,
-                submitted_to_google INTEGER DEFAULT 0,
+                submitted_to_google BOOLEAN DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
 
+        # 新增評論資料表
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS reviews (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                product_id TEXT NOT NULL,
+                reviewer_name TEXT NOT NULL,
+                rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+                comment TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
+            )
+        ''')
+        
         conn.commit()
         print("資料庫初始化完成")
 
 
 def save_products(products: list[dict]):
-    """儲存產品到資料庫（更新或插入）"""
+    """儲存產品到資料庫（更新或插入，並保留商品建立時間）"""
     with get_db() as conn:
         cursor = conn.cursor()
 
         for p in products:
             cursor.execute('''
-                INSERT OR REPLACE INTO products
+                INSERT INTO products
                 (id, sku, name, price, original_price, image_url, product_url, category, category_name, roast, processing, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    sku=excluded.sku,
+                    name=excluded.name,
+                    price=excluded.price,
+                    original_price=excluded.original_price,
+                    image_url=excluded.image_url,
+                    product_url=excluded.product_url,
+                    category=excluded.category,
+                    category_name=excluded.category_name,
+                    roast=excluded.roast,
+                    processing=excluded.processing,
+                    updated_at=excluded.updated_at
             ''', (
                 p['id'], p['sku'], p['name'], p['price'], p.get('original_price'),
                 p['image_url'], p['product_url'], p['category'], p['category_name'],
@@ -185,6 +210,34 @@ def get_all_products(category: Optional[str] = None, min_price: Optional[int] = 
         rows = cursor.fetchall()
         return [dict(row) for row in rows]
 
+def get_newest_products(days: int = 7) -> list[dict]:
+    """取得最近 N 天內首次建立的產品 (即本次新品)"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        
+        query = """
+            SELECT * FROM products
+            WHERE created_at >= datetime('now', ?)
+            ORDER BY purchase_count DESC, created_at DESC, category, name ASC
+        """
+        cursor.execute(query, (f'-{days} days',))
+        
+        rows = cursor.fetchall()
+        
+        # 如果最近 N 天內沒有任何新品，為了避免頁面空白，
+        # 我們退而求其次：找出「最新資料庫中 created_at 最大的那一批」
+        if not rows:
+            cursor.execute('''
+                SELECT * FROM products
+                WHERE date(created_at) = (
+                    SELECT date(max(created_at)) FROM products
+                )
+                ORDER BY category, name ASC
+            ''')
+            rows = cursor.fetchall()
+            
+        return [dict(row) for row in rows]
+
 def update_sales_statistics():
     """統計訂單，更新產品購買次數，並產生銷售統計數據 (統計 JSON)"""
     with get_db() as conn:
@@ -206,11 +259,8 @@ def update_sales_statistics():
                         products_counts[name] += qty
             except (json.JSONDecodeError, TypeError):
                 continue
-
-        # 2. 更新資料庫 (累加)
-        for name, count in products_counts.items():
-            cursor.execute("UPDATE products SET purchase_count = purchase_count + ? WHERE name = ?", (count, name))
-
+        
+        # 移除先前的更新資料庫(累加)邏輯，因為現在改為即時更新 purchase_count
         conn.commit()
 
         # 3. 產生統計數據 (從最新的 DB 狀態查詢)
@@ -316,7 +366,15 @@ def get_current_sales_statistics() -> dict:
 
     for order in orders:
         items = order['items'] # get_all_orders 已經 parse json
+        
+        # 增加防禦性機制：確保 items 是列表
+        if isinstance(items, dict):
+            items = list(items.values())
+            
         for item in items:
+            if not isinstance(item, dict):
+                continue
+                
             name = item.get('name')
             qty = item.get('quantity', 0)
 
@@ -462,8 +520,18 @@ def create_order(customer_name: str, items: list[dict], total: int) -> int:
             INSERT INTO orders (customer_name, items_json, total, created_at)
             VALUES (?, ?, ?, ?)
         ''', (customer_name, json.dumps(items, ensure_ascii=False), total, now))
+        
+        order_id = cursor.lastrowid
+        
+        # 即時更新商品的已售出數量
+        for item in items:
+            name = item.get('name')
+            qty = item.get('quantity', 0)
+            if name and qty > 0:
+                cursor.execute('UPDATE products SET purchase_count = IFNULL(purchase_count, 0) + ? WHERE name = ?', (qty, name))
+        
         conn.commit()
-        return cursor.lastrowid
+        return order_id
 
 
 def get_all_orders() -> list[dict]:
@@ -476,7 +544,15 @@ def get_all_orders() -> list[dict]:
         orders = []
         for row in rows:
             order = dict(row)
-            order['items'] = json.loads(order['items_json'])
+            try:
+                items_data = json.loads(order['items_json'])
+                # 強制轉換為列表格式，確保相容性
+                if isinstance(items_data, dict):
+                    order['items'] = list(items_data.values())
+                else:
+                    order['items'] = items_data
+            except (json.JSONDecodeError, TypeError):
+                order['items'] = []
             orders.append(order)
 
         return orders
@@ -833,6 +909,17 @@ def delete_order(order_id: int) -> bool:
     """刪除整筆訂單"""
     with get_db() as conn:
         cursor = conn.cursor()
+        
+        cursor.execute('SELECT items_json FROM orders WHERE id = ?', (order_id,))
+        row = cursor.fetchone()
+        if row:
+            items = json.loads(row['items_json'])
+            for item in items:
+                name = item.get('name')
+                qty = item.get('quantity', 0)
+                if name and qty > 0:
+                    cursor.execute('UPDATE products SET purchase_count = MAX(0, IFNULL(purchase_count, 0) - ?) WHERE name = ?', (qty, name))
+                    
         cursor.execute('DELETE FROM orders WHERE id = ?', (order_id,))
         conn.commit()
         return cursor.rowcount > 0
@@ -860,12 +947,20 @@ def update_order_item(order_id: int, product_name: str, new_quantity: int) -> bo
 
         for item in items:
             if item['name'] == product_name:
+                old_qty = item.get('quantity', 0)
+                delta = new_quantity - old_qty
+                
                 if new_quantity > 0:
                     item['quantity'] = new_quantity
                     new_items.append(item)
                     new_total += item['price'] * new_quantity
+                
                 # 如果 quantity <= 0，就略過不加入 (即刪除)
                 updated = True
+                
+                # 即時更新商品的已售出數量
+                if delta != 0:
+                    cursor.execute('UPDATE products SET purchase_count = MAX(0, IFNULL(purchase_count, 0) + ?) WHERE name = ?', (delta, product_name))
             else:
                 new_items.append(item)
                 new_total += item['price'] * item['quantity']
@@ -887,6 +982,74 @@ def update_order_item(order_id: int, product_name: str, new_quantity: int) -> bo
         conn.commit()
         return True
 
+
+# ==========================================
+# 評論相關功能
+# ==========================================
+
+def add_review(product_id: str, reviewer_name: str, rating: int, comment: str) -> int:
+    """新增商品評論"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        now = get_now_utc8().strftime('%Y-%m-%d %H:%M:%S')
+        cursor.execute('''
+            INSERT INTO reviews (product_id, reviewer_name, rating, comment, created_at)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (product_id, reviewer_name, rating, comment, now))
+        conn.commit()
+        return cursor.lastrowid
+
+
+def get_reviews_by_product(product_id: str) -> list[dict]:
+    """取得單一商品的所有評論"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT * FROM reviews 
+            WHERE product_id = ? 
+            ORDER BY created_at DESC
+        ''', (product_id,))
+        rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+
+
+def get_product_review_stats(product_id: str) -> dict:
+    """取得單一商品的評論統計(平均星數、評論總數)"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT AVG(rating) as avg_rating, COUNT(*) as review_count
+            FROM reviews
+            WHERE product_id = ?
+        ''', (product_id,))
+        row = cursor.fetchone()
+        
+        avg = row['avg_rating'] if row['avg_rating'] is not None else 0.0
+        
+        return {
+            'avg_rating': round(avg, 1),
+            'review_count': row['review_count']
+        }
+
+
+def get_all_product_review_stats() -> dict:
+    """取得所有商品的評論統計(避免N+1查詢)"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT product_id, AVG(rating) as avg_rating, COUNT(*) as review_count
+            FROM reviews
+            GROUP BY product_id
+        ''')
+        rows = cursor.fetchall()
+        
+        stats = {}
+        for row in rows:
+            stats[row['product_id']] = {
+                'avg_rating': round(row['avg_rating'], 1),
+                'review_count': row['review_count']
+            }
+        return stats
 
 
 if __name__ == "__main__":

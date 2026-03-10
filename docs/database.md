@@ -47,6 +47,18 @@
 | `price` | INTEGER | 購買時單價 |
 | `quantity` | INTEGER | 數量 |
 
+### 4. `reviews` (商品評論表)
+儲存使用者對特定商品的評分與留言。
+
+| 欄位名稱 | 類型 | 說明 |
+|----------|------|------|
+| `id` | INTEGER (PK) | 評論自動遞增 ID |
+| `product_id` | TEXT (FK) | 關聯產品 ID |
+| `reviewer_name` | TEXT | 評論者姓名 (匿名、顯示名稱) |
+| `rating` | INTEGER | 評分 (1-5 星) |
+| `comment` | TEXT | 評論內容 |
+| `created_at` | DATETIME | 建立時間 |
+
 ---
 
 ## 📄 JSON 儲存

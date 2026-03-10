@@ -21,11 +21,10 @@
                 <a href="{{ url_for('products', category='beans') }}" class="nav-link">咖啡豆</a>
                 <a href="{{ url_for('products', category='drip') }}" class="nav-link">濾掛包</a>
                 <a href="{{ url_for('products', category='giftbox') }}" class="nav-link">禮盒</a>
-                {% if config.special_events and config.special_events.new_year_giftbox.enabled %}
-                <a href="{{ url_for('products', category=config.special_events.new_year_giftbox.category_key) }}"
-                    class="nav-link" style="color: #ffecc2; font-weight: bold;">{{
-                    config.special_events.new_year_giftbox.name }}</a>
-                {% endif %}
+
+                <!-- 新增：本次新品分頁 -->
+                <a href="{{ url_for('new_products') }}" class="nav-link" style="color: #ffecc2; font-weight: bold;">⭐
+                    本次新品</a>
                 <a href="{{ url_for('orders_page') }}" class="nav-link">本期訂單統計</a>
                 <a href="{{ url_for('my_orders') }}" class="nav-link">我的訂單</a>
             </div>
@@ -47,6 +46,54 @@
 
         {% block content %}{% endblock %}
     </main>
+
+    <!-- 行動端底部導覽列 -->
+    <nav class="bottom-nav">
+        <a href="{{ url_for('index') }}" class="bottom-nav-item {% if request.endpoint == 'index' %}active{% endif %}">
+            <span class="nav-icon">🏠</span>
+            <span class="nav-label">首頁</span>
+        </a>
+
+        <!-- 商品（帶彈出子選單） -->
+        <div class="bottom-nav-item {% if request.endpoint == 'products' %}active{% endif %}"
+            onclick="toggleNavPopup(event, 'productsPopup')">
+            <span class="nav-icon">☕</span>
+            <span class="nav-label">商品</span>
+            <div class="nav-popup" id="productsPopup">
+                <a href="{{ url_for('products', category='drip') }}" class="nav-popup-item">☕ 濾掛包</a>
+                <a href="{{ url_for('products', category='beans') }}" class="nav-popup-item">🌰 咖啡豆</a>
+                <a href="{{ url_for('products', category='giftbox') }}" class="nav-popup-item">🎁 禮盒</a>
+            </div>
+        </div>
+
+        <a href="{{ url_for('new_products') }}"
+            class="bottom-nav-item {% if request.endpoint == 'new_products' %}active{% endif %}">
+            <span class="nav-icon">⭐</span>
+            <span class="nav-label">新品</span>
+        </a>
+
+        <!-- 訂單（帶彈出子選單） -->
+        <div class="bottom-nav-item {% if request.endpoint in ['orders_page', 'my_orders'] %}active{% endif %}"
+            onclick="toggleNavPopup(event, 'ordersPopup')">
+            <span class="nav-icon">📎</span>
+            <span class="nav-label">訂單</span>
+            <div class="nav-popup" id="ordersPopup">
+                <a href="{{ url_for('orders_page') }}" class="nav-popup-item">📊 本期統計</a>
+                <a href="{{ url_for('my_orders') }}" class="nav-popup-item">📝 我的訂單</a>
+            </div>
+        </div>
+
+        <a href="{{ url_for('cart') }}" class="bottom-nav-item {% if request.endpoint == 'cart' %}active{% endif %}">
+            <span class="nav-icon">🛒</span>
+            <span class="nav-label">購物車</span>
+            {% if cart_count > 0 %}
+            <span class="bottom-nav-badge">{{ cart_count }}</span>
+            {% endif %}
+        </a>
+    </nav>
+
+    <!-- 篩選面板遮罩 -->
+    <div class="filter-overlay" id="filterOverlay" onclick="closeFilterSheet()"></div>
 
     <footer class="footer">
         <div class="footer-content">
@@ -134,7 +181,104 @@
         .btn-submit-feedback:hover {
             background: #463020;
         }
+
+        /* Review Styles */
+        .review-card {
+            border-bottom: 1px solid #eee;
+            padding: 1rem 0;
+            margin-bottom: 0.5rem;
+        }
+
+        .review-card:last-child {
+            border-bottom: none;
+        }
+
+        .review-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .review-name {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .review-date {
+            font-size: 0.8rem;
+            color: #999;
+        }
+
+        .review-stars {
+            color: #f5a623;
+            letter-spacing: 2px;
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .review-text {
+            color: #555;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .star-rating span {
+            transition: color 0.2s;
+        }
+
+        .star-rating span:hover,
+        .star-rating span.active {
+            color: #f5a623;
+        }
     </style>
+
+    <!-- Review List Modal -->
+    <div id="reviewListModal" class="feedback-modal">
+        <div class="feedback-content" style="max-height: 85vh; display: flex; flex-direction: column;">
+            <span class="close-feedback" onclick="closeReviewListModal()">&times;</span>
+            <h3 id="reviewListTitle">💬 商品評價</h3>
+            <div id="reviewListContainer"
+                style="margin: 1rem 0; text-align: left; overflow-y: auto; flex-grow: 1; min-height: 100px;">
+                <!-- Reviews injected here -->
+            </div>
+            <button class="btn-submit-feedback" style="margin-top: 1rem;" onclick="openWriteReviewModal()">我要評論</button>
+        </div>
+    </div>
+
+    <!-- Write Review Modal -->
+    <div id="writeReviewModal" class="feedback-modal">
+        <div class="feedback-content">
+            <span class="close-feedback" onclick="closeWriteReviewModal()">&times;</span>
+            <h3 id="writeReviewTitle">評分與評論</h3>
+
+            <div style="margin: 1.5rem 0; text-align: left;">
+                <label style="display: block; margin-bottom: 0.5rem; color: #666; font-size: 0.9rem;">身分 (歷史買家)</label>
+                <select id="reviewNameSelect"
+                    style="width: 100%; padding: 0.8rem; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 1.5rem; font-size: 1rem;">
+                    <option value="匿名">匿名 (不公開姓名)</option>
+                    {% for name in all_names %}
+                    <option value="{{ name }}">{{ name }}</option>
+                    {% endfor %}
+                </select>
+
+                <label
+                    style="display: block; margin-bottom: 0.5rem; color: #666; font-size: 0.9rem; text-align: center;">星數評分</label>
+                <div class="star-rating" id="starRating"
+                    style="font-size: 2.5rem; color: #ddd; cursor: pointer; margin-bottom: 1.5rem; text-align: center; display: flex; justify-content: center; gap: 5px;">
+                    <span data-value="1">★</span><span data-value="2">★</span><span data-value="3">★</span><span
+                        data-value="4">★</span><span data-value="5">★</span>
+                </div>
+                <input type="hidden" id="reviewRating" value="0">
+
+                <label style="display: block; margin-bottom: 0.5rem; color: #666; font-size: 0.9rem;">心得 (選填)</label>
+                <textarea id="reviewComment" placeholder="分享您的品飲心得..." rows="4"
+                    style="width: 100%; padding: 1rem; border: 1px solid #ddd; border-radius: 8px; resize: vertical; font-size: 1rem; box-sizing: border-box;"></textarea>
+            </div>
+
+            <button class="btn-submit-feedback" id="submitReviewBtn" onclick="submitReview()">送出評論</button>
+        </div>
+    </div>
 
     <script src="{{ url_for('static', filename='app.js') }}"></script>
     <script>
