@@ -298,54 +298,6 @@ img {
     color: var(--text-light);
 }
 
-/* 產品佈局 (Default Mobile-First Hidden) */
-.products-layout {
-    display: block;
-}
-
-.products-sidebar {
-    background: var(--card-bg);
-    border-radius: 16px 16px 0 0;
-    /* Mobile-ready top radius */
-    padding: 1.5rem;
-    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.15);
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    width: 100%;
-    max-height: 75vh;
-    z-index: 2100;
-    transform: translateY(105%);
-    visibility: hidden;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-}
-
-/* 顯示於桌面版 (Sticky Sidebar for Desktop) */
-@media (min-width: 769px) {
-    .products-layout {
-        display: grid;
-        grid-template-columns: 280px 1fr;
-        gap: 2rem;
-        align-items: start;
-    }
-
-    .products-sidebar {
-        position: sticky;
-        top: 100px;
-        transform: none;
-        visibility: visible;
-        width: auto;
-        height: fit-content;
-        max-height: calc(100vh - 120px);
-        border-radius: var(--radius);
-        box-shadow: var(--shadow);
-        z-index: 10;
-        padding: 1.5rem;
-    }
-}
-
 .products-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -925,22 +877,10 @@ img {
    ======================================== */
 .filter-overlay {
     display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.4);
-    z-index: 2000;
-    animation: fadeInBackdrop 0.2s ease;
-}
-
-.filter-overlay.open {
-    display: block;
 }
 
 /* ========================================
-   動畫定義
+   按壓回饋動畫
    ======================================== */
 @keyframes slideUp {
     from {
@@ -1000,7 +940,10 @@ img {
 @media (max-width: 768px) {
 
     /* --- 隱藏桌面導覽，顯示行動底部導覽 --- */
-    .nav-links,
+    .nav-links {
+        display: none;
+    }
+
     .cart-button {
         display: none;
     }
@@ -1023,15 +966,16 @@ img {
         left: 0;
         width: 100%;
         height: 64px;
-        background: rgba(255, 255, 255, 0.92);
+        background: #fff;
         border-top: 1px solid #e0e0e0;
         box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.08);
         z-index: 1000;
         justify-content: space-around;
         align-items: center;
         padding: 0 4px;
-        backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
+        backdrop-filter: blur(12px);
+        background: rgba(255, 255, 255, 0.92);
     }
 
     .bottom-nav-item {
@@ -1066,6 +1010,11 @@ img {
         font-size: 1.35rem;
         line-height: 1;
         margin-bottom: 2px;
+    }
+
+    .bottom-nav-item .nav-label {
+        line-height: 1;
+        white-space: nowrap;
     }
 
     .bottom-nav-badge {
@@ -1118,6 +1067,10 @@ img {
         -webkit-tap-highlight-color: transparent;
     }
 
+    .nav-popup-item:active {
+        background: var(--accent-light);
+    }
+
     /* --- 主要內容區 --- */
     .main-content {
         padding: 1rem;
@@ -1131,6 +1084,10 @@ img {
 
     .hero h1 {
         font-size: 1.6rem;
+    }
+
+    .hero p {
+        font-size: 1rem;
     }
 
     .hero::before {
@@ -1236,11 +1193,7 @@ img {
         min-height: 44px;
     }
 
-    /* --- 篩選面板 (Mobile Styles) --- */
-    .products-layout {
-        display: block;
-    }
-
+    /* --- 篩選面板 Bottom Sheet --- */
     .mobile-filter-toggle {
         display: flex;
         min-height: 48px;
@@ -1256,11 +1209,40 @@ img {
         -webkit-tap-highlight-color: transparent;
     }
 
+    .filter-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.4);
+        z-index: 2000;
+        animation: fadeInBackdrop 0.2s ease;
+    }
+
+    .filter-overlay.open {
+        display: block;
+    }
+
     .products-sidebar {
-        /* Base properties inherited from global mobile-first definition */
-        border: none;
-        padding: 0 1.25rem 2rem 1.25rem !important;
+        position: fixed !important;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: 100% !important;
+        max-height: 75vh;
+        z-index: 2100;
+        background: white;
+        border-radius: 16px 16px 0 0;
+        box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.15);
+        transform: translateY(100%);
+        visibility: hidden;
         transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s linear 0.35s;
+        overflow-y: auto;
+        padding: 0 1.25rem 2rem 1.25rem !important;
+        display: block !important;
+        -webkit-overflow-scrolling: touch;
     }
 
     .products-sidebar.open {
@@ -1279,9 +1261,18 @@ img {
     }
 }
 
-/* --- 隱藏行動端篩選按鈕於桌面版 --- */
-@media (min-width: 769px) {
-    .mobile-filter-toggle {
-        display: none;
+@keyframes fadeInBackdrop {
+    from {
+        opacity: 0;
     }
+
+    to {
+        opacity: 1;
+    }
+}
+
+/* --- 隱藏行動端篩選元件於桌面版 --- */
+.mobile-filter-toggle,
+.filter-overlay {
+    display: none;
 }
