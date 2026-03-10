@@ -8,7 +8,7 @@ import json
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 
-from .models import (
+from src.models import (
     init_db, save_products, get_all_products, get_product_by_id,
     get_products_by_ids, get_categories, create_order, get_all_orders,
     get_order_statistics, mark_order_submitted, export_orders_to_xlsx,
@@ -16,8 +16,8 @@ from .models import (
     get_common_prices, get_product_facets, ROAST_GROUPS, update_sales_statistics,
     get_current_sales_statistics, get_newest_products, add_review, get_reviews_by_product, get_all_product_review_stats
 )
-from .scraper import scrape_all_products, CATEGORY_NAMES
-from .google_integration import submit_order_to_google
+from src.scraper import scrape_all_products, CATEGORY_NAMES
+from src.google_integration import submit_order_to_google
 
 # 設定 template 和 static 路徑指向專案根目錄
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -516,8 +516,20 @@ def api_feedback():
         return jsonify({'success': False, 'message': f'儲存失敗: {str(e)}'})
 
 
+# ========================================
+# 初始化應用程式
+# ========================================
+
+# 在 Vercel 環境或是啟動時初始化資料庫
+with app.app_context():
+    try:
+        init_db()
+        print("Vercel/Global DB Init Successful")
+    except Exception as e:
+        print(f"DB Init Error: {e}")
+
 def initialize_app():
-    """初始化應用程式"""
+    """初始化應用程式 (僅供本地 CLI 使用)"""
     print("=" * 50)
     print("咖啡團購系統")
     print("=" * 50)
