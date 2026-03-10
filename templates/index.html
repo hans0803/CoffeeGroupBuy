@@ -81,9 +81,8 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        const roastStats = {{ stats.roast_stats | tojson
-    }};
-    const priceStats = {{ stats.price_stats | tojson }};
+        const roastStats = {{ (stats.roast_stats if stats else { }) | tojson | safe }};
+    const priceStats = {{ (stats.price_stats if stats else { }) | tojson | safe }};
 
     // 1. Roast Chart (Pie)
     const ctxRoast = document.getElementById('roastChart').getContext('2d');
