@@ -17,13 +17,13 @@
 | `price` | INTEGER | 售價 (NT$) |
 | `original_price` | INTEGER | 原價 (若有) |
 | `description` | TEXT | 產品描述 |
-| `image_url` | TEXT | 圖片路徑 (本地 static 路徑) |
+| `image_url` | TEXT | 圖片網址 (優先儲存遠端 URL，確保雲端部署正確顯示) |
 | `product_url` | TEXT | 官網原始連結 |
 | `category` | TEXT | 分類 (beans, drip, giftbox) |
 | `roast` | TEXT | 烘焙度 (淺焙, 中焙, 深焙...) |
 | `processing` | TEXT | 處理法 (日曬, 水洗...) |
-| `created_at` | DATETIME | 建立時間 |
-| `purchase_count` | INTEGER | 歷史累積銷量 (用於首頁熱銷排行) |
+| `created_at` | TIMESTAMP | 建立時間 (支援 Postgres `TIMESTAMP`) |
+| `purchase_count` | INTEGER | 歷史累積銷量 (雲端與本地同步，用於熱銷排行與統計) |
 
 ### 2. `orders` (訂單表)
 儲存使用者的訂單主檔。

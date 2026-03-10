@@ -2,6 +2,11 @@
 
 All notable changes to the Coffee Group Buy project will be documented in this file.
 
+## [1.1.1] - 2026-03-11
+### Added
+- **New Products Filtering**: Enabled full support for roast level and price filters on the "本次新品" (New Products) sheet.
+- **Extreme Mobile UX Fix**: Implemented the "Physical Removal" strategy for the product sidebar. Using `display: none` by default and a two-phase JS toggle to completely eliminate rendering flickers in Safari and other browsers.
+
 ## [1.1.0] - 2026-03-10
 ### Added
 - **Hybrid Database Engine**: Added support for **PostgreSQL (Neon)** alongside local **SQLite**. The system automatically detects `DATABASE_URL` to switch modes.

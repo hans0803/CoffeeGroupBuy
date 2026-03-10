@@ -23,7 +23,11 @@
 
 ### 爬蟲 (Scraper)
 - **工具**: Requests + BeautifulSoup4
-- **圖片處理**: 直接儲存原始遠端 URL 到資料庫，免除本地存儲需求 (Cloud-ready)。
+- **圖片策略 (Remote-First)**: 直接儲存原始遠端 URL 到資料庫，免除本地存縮需求，確保 Vercel 雲端環境能正確顯示圖片。
+
+### 手機版優化 (Mobile UX Strategy)
+- **物理消滅 (Physical Removal)**: 為解決 Safari 渲染跳動 (Flicker)，側邊欄預設為 `display: none`。
+- **二階段切換**: JavaScript 開啟側邊欄時，先設為 `block` 再觸發 CSS `.open` 動態，確保過渡平滑且無閃爍。
 
 ---
 
