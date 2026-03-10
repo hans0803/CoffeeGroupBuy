@@ -436,11 +436,11 @@ def get_common_prices(category: Optional[str] = None, limit: int = 12) -> List[i
             params.append(category)
 
         # 只取有意義的價格
-        query += " GROUP BY price HAVING count > 0 ORDER BY price ASC LIMIT ?"
+        query += " GROUP BY price ORDER BY price ASC LIMIT ?"
         params.append(limit)
 
-        cursor.execute(query, tuple(params))
-        return [row['price'] for row in cursor.fetchall()]
+        rows = db_execute(cursor, query, tuple(params), fetch='all')
+        return [row_to_dict(cursor, row)['price'] for row in rows]
 
 
 def get_current_sales_statistics() -> dict:
@@ -546,24 +546,24 @@ def get_product_facets(category: str) -> dict:
         cursor = conn.cursor()
 
         # 取得烘焙度
-        cursor.execute('''
+        rows = db_execute(cursor, '''
             SELECT roast, COUNT(*) as count
             FROM products
             WHERE category = ? AND roast IS NOT NULL AND roast != ''
             GROUP BY roast
             ORDER BY count DESC
-        ''', (category,))
-        facets['roast'] = [row['roast'] for row in cursor.fetchall()]
+        ''', (category,), fetch='all')
+        facets['roast'] = [row_to_dict(cursor, row)['roast'] for row in rows]
 
         # 取得處理法
-        cursor.execute('''
+        rows = db_execute(cursor, '''
             SELECT processing, COUNT(*) as count
             FROM products
             WHERE category = ? AND processing IS NOT NULL AND processing != ''
             GROUP BY processing
             ORDER BY count DESC
-        ''', (category,))
-        facets['processing'] = [row['processing'] for row in cursor.fetchall()]
+        ''', (category,), fetch='all')
+        facets['processing'] = [row_to_dict(cursor, row)['processing'] for row in rows]
 
     return facets
 
@@ -572,9 +572,8 @@ def get_product_by_id(product_id: str) -> Optional[dict]:
     """根據 ID 取得單一產品"""
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute('SELECT * FROM products WHERE id = ?', (product_id,))
-        row = cursor.fetchone()
-        return dict(row) if row else None
+        row = db_execute(cursor, 'SELECT * FROM products WHERE id = ?', (product_id,), fetch='one')
+        return row_to_dict(cursor, row)
 
 
 def get_products_by_ids(product_ids: List[str]) -> List[Dict]:
@@ -585,22 +584,20 @@ def get_products_by_ids(product_ids: List[str]) -> List[Dict]:
     with get_db() as conn:
         cursor = conn.cursor()
         placeholders = ','.join('?' * len(product_ids))
-        cursor.execute(f'SELECT * FROM products WHERE id IN ({placeholders})', product_ids)
-        rows = cursor.fetchall()
-        return [dict(row) for row in rows]
+        rows = db_execute(cursor, f'SELECT * FROM products WHERE id IN ({placeholders})', tuple(product_ids), fetch='all')
+        return [row_to_dict(cursor, row) for row in rows]
 
 
 def get_categories() -> List[Dict]:
     """取得所有分類及其產品數量"""
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute('''
+        rows = db_execute(cursor, '''
             SELECT category, category_name, COUNT(*) as count
             FROM products
             GROUP BY category, category_name
             ORDER BY category
-        ''')
-        rows = cursor.fetchall()
+        ''', fetch='all')
         return [row_to_dict(cursor, row) for row in rows]
 
 
@@ -635,9 +632,9 @@ def create_order(customer_name: str, items: List[Dict], total: int) -> int:
             qty = item.get('quantity', 0)
             if name and qty > 0:
                 if IS_POSTGRES:
-                    cursor.execute('UPDATE products SET purchase_count = COALESCE(purchase_count, 0) + %s WHERE name = %s', (qty, name))
+                    db_execute(cursor, 'UPDATE products SET purchase_count = COALESCE(purchase_count, 0) + %s WHERE name = %s', (qty, name))
                 else:
-                    cursor.execute('UPDATE products SET purchase_count = IFNULL(purchase_count, 0) + ? WHERE name = ?', (qty, name))
+                    db_execute(cursor, 'UPDATE products SET purchase_count = IFNULL(purchase_count, 0) + ? WHERE name = ?', (qty, name))
         
         conn.commit()
         return order_id
@@ -647,12 +644,11 @@ def get_all_orders() -> List[Dict]:
     """取得所有訂單"""
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute('SELECT * FROM orders ORDER BY created_at DESC')
-        rows = cursor.fetchall()
+        rows = db_execute(cursor, 'SELECT * FROM orders ORDER BY created_at DESC', fetch='all')
 
         orders = []
         for row in rows:
-            order = dict(row)
+            order = row_to_dict(cursor, row)
             try:
                 items_data = json.loads(order['items_json'])
                 # 強制轉換為列表格式，確保相容性
@@ -671,16 +667,8 @@ def mark_order_submitted(order_id: int):
     """標記訂單已提交到 Google"""
     with get_db() as conn:
         cursor = conn.cursor()
-        if IS_POSTGRES:
-            cursor.execute(
-                'UPDATE orders SET submitted_to_google = TRUE WHERE id = %s',
-                (order_id,)
-            )
-        else:
-            cursor.execute(
-                'UPDATE orders SET submitted_to_google = 1 WHERE id = ?',
-                (order_id,)
-            )
+        val = True if IS_POSTGRES else 1
+        db_execute(cursor, 'UPDATE orders SET submitted_to_google = ? WHERE id = ?', (val, order_id))
         conn.commit()
 
 
@@ -690,23 +678,22 @@ def get_order_statistics() -> dict:
         cursor = conn.cursor()
 
         # 總訂單數
-        cursor.execute('SELECT COUNT(*) as count FROM orders')
-        row = cursor.fetchone()
-        total_orders = row['count'] if row else 0
+        row = db_execute(cursor, 'SELECT COUNT(*) as count FROM orders', fetch='one')
+        total_orders = row_to_dict(cursor, row)['count'] if row else 0
 
         # 總金額
-        cursor.execute('SELECT SUM(total) as total_amount FROM orders')
-        row = cursor.fetchone()
-        total_amount = (row['total_amount'] if row else 0) or 0
+        row = db_execute(cursor, 'SELECT SUM(total) as total_amount FROM orders', fetch='one')
+        res = row_to_dict(cursor, row)
+        total_amount = (res['total_amount'] if res else 0) or 0
 
         # 各使用者統計
-        cursor.execute('''
+        rows = db_execute(cursor, '''
             SELECT customer_name, COUNT(*) as order_count, SUM(total) as total_spent
             FROM orders
             GROUP BY customer_name
             ORDER BY total_spent DESC
-        ''')
-        user_stats = [dict(row) for row in cursor.fetchall()]
+        ''', fetch='all')
+        user_stats = [row_to_dict(cursor, row) for row in rows]
 
         return {
             'total_orders': total_orders,
@@ -1000,15 +987,14 @@ def get_orders_by_customer(name: str) -> List[Dict]:
     """根據姓名取得訂單"""
     with get_db() as conn:
         cursor = conn.cursor()
-        db_execute(cursor, 
+        rows = db_execute(cursor, 
             'SELECT * FROM orders WHERE customer_name = ? ORDER BY created_at DESC',
-            (name,)
+            (name,), fetch='all'
         )
-        rows = cursor.fetchall()
 
         orders = []
         for row in rows:
-            order = dict(row)
+            order = row_to_dict(cursor, row)
             order['items'] = json.loads(order['items_json'])
             orders.append(order)
 
