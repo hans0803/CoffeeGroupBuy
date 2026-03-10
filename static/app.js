@@ -310,30 +310,18 @@ function initFilterSheet() {
     const sidebar = document.getElementById('filterSidebar');
     if (!sidebar) return;
 
-    // 添加一個快速關閉的 CSS class
-    if (!document.getElementById('no-transition-style')) {
-        const s = document.createElement('style');
-        s.id = 'no-transition-style';
-        s.textContent = '.no-transition { transition: none !important; }';
-        document.head.appendChild(s);
-    }
-
     // 監聽側邊欄內的所有點擊事件 (Event Delegation)
     sidebar.addEventListener('click', (e) => {
         const target = e.target;
-        // 如果點擊的是篩選連結或按鈕 (排除 drag handle)
-        if (target.closest('a') || target.closest('button')) {
-            sidebar.classList.add('no-transition');
+        // 如果點擊的是分類連結、分頁按鈕或篩選提交
+        if (target.closest('a') || target.closest('button[type="submit"]')) {
             closeFilterSheet();
-            // 在一小段時間後移除，確保下次開啟時仍有動畫 (雖然頁面通常會重整)
-            setTimeout(() => sidebar.classList.remove('no-transition'), 100);
         }
     });
 
-    // 監聽表單提交 (自訂價格範圍)
+    // 監聽價格表單提交
     sidebar.querySelectorAll('form').forEach(form => {
         form.addEventListener('submit', () => {
-            sidebar.classList.add('no-transition');
             closeFilterSheet();
         });
     });
