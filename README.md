@@ -31,6 +31,11 @@
 
 - 點擊頁面底部的「匿名回饋」，可直接傳送系統建議給開發者。
 
+### 5. ☁️ 雲端與混合資料庫 (Hybrid Cloud DB)
+
+- **自動切換**: 本地運行使用 SQLite；設定 `DATABASE_URL` 後自動切換為 **Postgres (Neon)** 雲端模式。
+- **免本地存儲**: 支援遠端圖片 URL 與動態統計，完美適配 **Vercel** 部署。
+
 ---
 
 ## 🚀 快速開始
@@ -97,32 +102,26 @@ python 3_export.py
 
 ---
 
+### 4️⃣ 雲端部署 (Vercel + Neon)
+
+1. 在 [Neon.tech](https://neon.tech) 建立免費 PostgreSQL 並取得 `DATABASE_URL`。
+2. 將連結放入 `.env` (本地) 或 Vercel 環境變數中。
+3. 執行 `1_update.py` 將商品資料同步到雲端資料庫。
+4. 將程式碼推送到 GitHub，Vercel 會自動完成部署。
+
+---
+
 ## 📂 專案結構
 
 ```
 coffee/
-├── config.json            # 網站內容設定檔 (首頁文字/公告)
-├── 1_update.py            # 入口：更新網站
-├── 2_server.py            # 入口：啟動伺服器 (開發)
-├── 3_export.py            # 入口：收單匯出
-├── run_prod.sh            # 入口：啟動伺服器 (生產/Gunicorn)
-├── src/                   # 核心模組
-│   ├── app.py             # Flask 應用程式 (含 API)
-│   ├── models.py          # 資料庫模型
-│   └── scraper.py         # 產品爬蟲
-├── data/                  # 資料儲存 (忽略 Git)
-│   ├── products.db        # SQLite 資料庫
-│   ├── feedback.json      # 匿名回饋
-│   └── *.xlsx             # 匯出報表
-├── static/
-│   ├── images/products/   # 產品圖片 (忽略 Git)
-│   ├── style.css
-│   └── app.js
-└── templates/             # HTML 模板
-    ├── index.html         # 首頁 (含 Dashboard)
-    ├── products.html      # 產品列表 (含篩選)
-    ├── my_orders.html     # 我的訂單
-    └── ...
+├── api/                   # Vercel 進入點 (index.py)
+├── src/                   # 核心模組 (app.py, models.py, scraper.py)
+├── data/                  # 本地資料 (SQLite, Excel)
+├── static/                # 靜態資源 (CSS, JS, 圖片)
+├── templates/             # HTML 模板
+├── vercel.json            # Vercel 部署設定
+└── config.json            # 網站內容設定
 ```
 
 ## 依賴套件

@@ -7,22 +7,23 @@
 ### 後端 (Backend)
 - **語言**: Python 3
 - **框架**: Flask (Web Framework)
-- **資料庫**: SQLite (本地輕量資料庫)
-- **伺服器 (Production)**: Gunicorn (WSGI HTTP Server)
+### 資料庫 (Database)
+- **本地**: SQLite (用於開發與本地離線運行)
+- **雲端**: PostgreSQL (Neon) - 用於 Vercel 等伺服器端環境
+- **自動偵測**: 透過 `DATABASE_URL` 環境變數自動切換資料庫引擎。
 
 ### 前端 (Frontend)
 - **模板引擎**: Jinja2 (Flask 內建)
 - **樣式**: Vanilla CSS (CSS3, Flexbox, Grid)
 - **互動**: Vanilla JavaScript (ES6+, Fetch API)
 - **圖表**: Chart.js (用於銷售儀表板)
-- **UI Components**:
-  - **Bottom Navigation**: Sticky bottom bar for mobile (≤ 768px) replacing hamburger menus.
-  - **Bottom-Sheets**: Filter sidebars and review modals natively transform into swipe-dismissible bottom sheets on mobile.
+- **UI 元件**:
+  - **手機版導覽**: 底部固定導覽列，支援快速切換。
+  - **面板轉換**: 篩選器與評論視窗在手機版會自動轉為 Bottom-Sheet 式樣。
 
 ### 爬蟲 (Scraper)
 - **工具**: Requests + BeautifulSoup4
-- **目標**: 來源網站 (Source Site)
-- **資源**: 自動下載產品圖片至 `static/images/products/`
+- **圖片處理**: 直接儲存原始遠端 URL 到資料庫，免除本地存儲需求 (Cloud-ready)。
 
 ---
 

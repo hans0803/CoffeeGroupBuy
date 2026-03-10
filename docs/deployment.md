@@ -23,33 +23,16 @@ pip install -r requirements.txt
 ```bash
 sh run_prod.sh
 ```
-或直接執行:
-```bash
-gunicorn -w 4 -b 0.0.0.0:5001 src.app:app
-```
-
-**參數說明**:
-- `-w 4`: 啟動 4 個 Worker processes，可同時處理 4 個併發請求。
-- `-b 0.0.0.0:5001`: 綁定所有網路介面，Port 5001。
-- `src.app:app`: 指定 Flask Application 的入口物件。
-
----
 
 ### 🟡 開發模式 (Development)
-適合開發與除錯。使用 Flask 內建伺服器。
-
-**啟動指令**:
+適合本地測試與開發。
 ```bash
 python 2_server.py
 ```
-**特性**:
-- 支援 Hot Reload (程式碼修改後自動重啟)
-- 單執行緒 (Single-threaded)，不適合多人同時操作。
 
 ## 4. 維運操作
 
 ### 更新產品資料
-定期執行爬蟲以更新產品：
 ```bash
 python 1_update.py
 ```
@@ -59,16 +42,29 @@ python 1_update.py
 ```bash
 python 3_export.py
 ```
-- 產出檔案位於 `data/` 目錄。
-- 建議備份 `data/orders_*.xlsx` 檔案。
 
-## 5. 常見問題 (FAQ)
+## 5. 雲端部署 (Vercel + Neon) - ✨ 全新支援
 
-**Q: 為何執行 `run_prod.sh` 出現 Permission denied?**
-A: 腳本可能沒有執行權限，請執行：
+本系統現在支援透過 **Vercel** 進行無伺服器 (Serverless) 部署。
+
+### 步驟 A：建立資料庫
+1. 在 [Neon.tech](https://neon.tech) 建立一個免費的 PostgreSQL 專案。
+2. 取得 `DATABASE_URL` 連線字串。
+
+### 步驟 B：同步商品資料
+在本地電腦設定 `.env` 包含雲端 `DATABASE_URL`，然後執行：
 ```bash
-chmod +x run_prod.sh
+python 1_update.py
 ```
+這會將最新的商品資料從官網爬取並直接寫入雲端 Neon 資料庫。
 
-**Q: 如何更改 Port?**
-A: 修改 `run_prod.sh` 中的 `-b 0.0.0.0:5001`，將 5001 改為想要的 Port。
+### 步驟 C：Vercel 設定
+1. 將專案推送到 GitHub。
+2. 在 Vercel 建立新專案。
+3. 在 **Settings -> Environment Variables** 加入：
+   - `DATABASE_URL`: 您的 Neon 連線字串。
+4. Vercel 會讀取 `vercel.json` 並自動完成部署。
+
+### 步驟 D：圖片與統計
+- **圖片**: 系統現在使用遠端 URL，因此 Vercel 不需存放圖片檔案。
+- **統計**: 首頁圖表改為從 DB 即時計算，確保資料在無伺服器環境下依然持久且準確。

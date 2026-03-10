@@ -1,6 +1,8 @@
-# 資料庫設計文件 (Database Schema)
+本系統支援 **混合資料庫架構**：
+- **本地端**: 使用 **SQLite**，檔案位於 `data/products.db`。
+- **雲端部署**: 支援 **PostgreSQL (Neon)**，透過 `DATABASE_URL` 環境變數連線。
 
-本系統使用 **SQLite** 作為主要資料儲存，檔案位於 `data/products.db`。
+系統提供 `db_execute` 自動轉譯 SQL 參數佔位符 (SQLite `?` -> Postgres `%s`)。
 
 ## 📋 資料表 (Tables)
 

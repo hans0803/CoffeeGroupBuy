@@ -2,20 +2,33 @@
 
 All notable changes to the Coffee Group Buy project will be documented in this file.
 
-## [Unreleased] - 2026-03
-
+## [1.1.0] - 2026-03-10
 ### Added
-- **Mobile Bottom Navigation**: Introduced a sticky bottom navigation bar for viewports ≤ 768px, providing immediate access to Home, Products, Orders, and Cart.
-- **Swipe-Dismissible Filter Sidebar**: Transformed the desktop sidebar filter into a modern, modal bottom-sheet on mobile.
-- **Product Review System**: Added a modal/bottom-sheet system for users to write and view 5-star product reviews and comments.
-- **"本次新品" (New Products) Tag**: Implemented backend logic to automatically flag and display products added in the most recent update batch.
-- **Real-Time Sales Dashboard**: Replaced static dashboard visuals with dynamic Chart.js charts (Roast preference, Price distribution) that update immediately after order submission.
+- **Hybrid Database Engine**: Added support for **PostgreSQL (Neon)** alongside local **SQLite**. The system automatically detects `DATABASE_URL` to switch modes.
+- **Vercel Cloud Deployment**: Fully compatible with Vercel's serverless environment.
+- **Remote Image Support**: Scraper now stores remote product image URLs, enabling deployment on platforms without persistent storage (like Vercel).
+- **Dynamic Real-Time Stats**: Refactored the homepage statistics to calculate directly from the database, ensuring accurate charts in ephemeral cloud environments.
 
 ### Changed
-- **Touch Target Accessibility**: Enforced a minimum touch target size of 44x44px for all interactive elements (add-to-cart buttons, quantity adjusters, checkout buttons) for improved mobile usability.
-- **Mobile Filter UX**: Optimized the filter interaction on mobile using instant state toggles (`display: none` -> `block`) and removed transitions during page reload to eliminate visual flickering.
+- **Mobile Filter Performance**: Implemented "Instant Hide" logic for bottom sheets and navigation sub-menus to eliminate flickering during page reloads.
 
 ### Fixed
-- **Home Page `TypeError`**: Fixed a critical error on the index route that caused server crashes when attempting to render legacy order items.
-- **Sidebar Blocking Bug**: Fixed an issue where the closed mobile filter sidebar's invisible bounding box and shadow would cover and block clicks on the bottom navigation bar.
-- **Submenu Animation Jitter**: Corrected CSS transition properties on bottom navigation submenus to prevent jittering when toggled rapidly.
+- **Historical Stats Restoration**: Recovered and synchronized missing historical purchase counts to the cloud database.
+- **"本次新品" Logic Fix**: Corrected a bug where the cloud migration reset all timestamps, causing all products to appear as "New". Now correctly displays only the most recent batch.
+- **Sidebar Click Blocking**: Fixed a CSS regression where the hidden filter sidebar would still capture clicks on mobile.
+
+## [1.0.1] - 2026-03
+### Added
+- **Mobile Bottom Navigation**: Introduced a sticky bottom navigation bar for viewports ≤ 768px.
+- **Product Review System**: Added a modal/bottom-sheet system for product reviews.
+- **"本次新品" Tag**: Automarking products added in the most recent update batch.
+- **Real-Time Sales Dashboard**: Dynamic Chart.js charts.
+
+### Changed
+- **Touch Target Accessibility**: Enforced minimum touch target size of 44x44px.
+- **Mobile Filter UX**: Optimized interaction using instant state toggles.
+
+### Fixed
+- **Home Page TypeError**: Fixed server crash on index route.
+- **Sidebar Blocking Bug**: Fixed click-blocking issue with hidden sidebar.
+- **Submenu Animation Jitter**: Corrected CSS transitions on submenus.
