@@ -282,9 +282,7 @@ def get_all_products(category: Optional[str] = None, min_price: Optional[int] = 
             query += " ORDER BY category, purchase_count DESC, price ASC, name ASC"
 
         rows = db_execute(cursor, query, tuple(params), fetch='all')
-        if IS_POSTGRES:
-            return [{k: v for k, v in zip([desc[0] for desc in cursor.description], row)} for row in rows]
-        return [dict(row) for row in rows]
+        return [row_to_dict(cursor, row) for row in rows]
 
 def get_newest_products(days: int = 7) -> List[Dict]:
     """取得最近 N 天內首次建立的產品 (即本次新品)"""
@@ -327,9 +325,7 @@ def get_newest_products(days: int = 7) -> List[Dict]:
                 '''
             rows = db_execute(cursor, fallback_query, fetch='all')
             
-        if IS_POSTGRES:
-            return [{k: v for k, v in zip([desc[0] for desc in cursor.description], row)} for row in rows]
-        return [dict(row) for row in rows]
+        return [row_to_dict(cursor, row) for row in rows]
 
 def update_sales_statistics():
     """統計訂單，更新產品購買次數，並產生銷售統計數據 (統計 JSON)"""
@@ -380,7 +376,10 @@ def update_sales_statistics():
         # 簡單映射烘焙度 (Align with ROAST_GROUPS)
         roast_counts = defaultdict(int)
 
-        for r_val, count in roast_rows:
+        for row in roast_rows:
+            d = row_to_dict(cursor, row)
+            r_val = d.get('roast')
+            count = d.get('purchase_count', 0)
             label = "其他"
             if not r_val:
                 label = "未分類"
