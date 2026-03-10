@@ -286,12 +286,20 @@ function toggleSidebar() {
     if (sidebar.classList.contains('open')) {
         closeFilterSheet();
     } else {
-        sidebar.classList.add('open');
-        if (overlay) overlay.classList.add('open');
-        document.body.style.overflow = 'hidden';
-        // Clear any inline styles set by dragging to let CSS !important take over
-        sidebar.style.removeProperty('transform');
-        sidebar.style.removeProperty('transition');
+        // 第一階段：先讓它在 DOM 樹中存在 (移除 inline display: none)
+        sidebar.style.display = 'block';
+
+        // 使用 requestAnimationFrame 確保瀏覽器已完成渲染 display 狀態
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                sidebar.classList.add('open');
+                if (overlay) overlay.classList.add('open');
+                document.body.style.overflow = 'hidden';
+                // 清除非必要的 inline styles
+                sidebar.style.removeProperty('transform');
+                sidebar.style.removeProperty('transition');
+            });
+        });
     }
 }
 
@@ -300,6 +308,12 @@ function closeFilterSheet() {
     const overlay = document.getElementById('filterOverlay');
     if (sidebar) {
         sidebar.classList.remove('open');
+        // 等待動畫結束後再徹底隱藏 (物理消滅)
+        setTimeout(() => {
+            if (!sidebar.classList.contains('open')) {
+                sidebar.style.display = 'none';
+            }
+        }, 350);
         sidebar.style.transform = '';
     }
     if (overlay) overlay.classList.remove('open');

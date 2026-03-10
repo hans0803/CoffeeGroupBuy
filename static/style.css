@@ -304,9 +304,11 @@ img {
     /* 手機版預設堆疊 */
 }
 
-/* 全域側邊欄重置：強制脫離流面，預設隱藏且位於螢幕下方 */
-/* 這保證了重新整理/分頁時，瀏覽器不會將其渲染在頁面流中，徹底根除閃爍 */
+/* 全域側邊欄重置：物理消滅 (display: none) */
+/* 這是保證 Safari 在初始渲染時絕對不會畫出任何東西的唯一方法 */
 .products-sidebar {
+    display: none;
+    /* 預設完全不進入渲染樹 */
     position: fixed;
     bottom: 0;
     left: 0;
@@ -320,7 +322,6 @@ img {
     transform: translateY(105%);
     visibility: hidden;
     overflow-y: auto;
-    display: block;
     -webkit-overflow-scrolling: touch;
     padding: 0 1.25rem 2rem 1.25rem;
 }
@@ -1285,6 +1286,8 @@ img {
     }
 
     .products-sidebar.open {
+        display: block !important;
+        /* 開啟時才允許顯示 */
         transform: translateY(0) !important;
         visibility: visible;
         transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s linear 0s;
