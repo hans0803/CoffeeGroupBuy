@@ -13,6 +13,17 @@ from contextlib import contextmanager
 from collections import defaultdict
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+from dotenv import load_dotenv
+
+load_dotenv()
+
+DATABASE_URL = os.environ.get("DATABASE_URL")
+IS_POSTGRES = bool(DATABASE_URL)
+
+if IS_POSTGRES:
+    import psycopg2
+    from psycopg2.extras import DictCursor
+
 
 # UTC+8 時區
 TZ_UTC8 = timezone(timedelta(hours=8))
@@ -35,23 +46,51 @@ def ensure_data_dir():
 
 @contextmanager
 def get_db():
-    """取得資料庫連線的 context manager"""
-    ensure_data_dir()
-    conn = sqlite3.connect(DATABASE_PATH)
-    conn.row_factory = sqlite3.Row
-    try:
-        yield conn
-    finally:
-        conn.close()
+    """取得資料庫連線的 context manager (支援 SQLite 或 PostgreSQL)"""
+    if IS_POSTGRES:
+        conn = psycopg2.connect(DATABASE_URL)
+        try:
+            yield conn
+        finally:
+            conn.close()
+    else:
+        ensure_data_dir()
+        conn = sqlite3.connect(DATABASE_URL_LOCAL if 'DATABASE_URL_LOCAL' in globals() else DATABASE_PATH)
+        conn.row_factory = sqlite3.Row
+        try:
+            yield conn
+        finally:
+            conn.close()
+
+def db_execute(cursor, query: str, params: tuple = (), fetch: str = None):
+    """
+    通用 SQL 執行函式：
+    自動將 SQLite 的 '?' 轉換為 PostgreSQL 的 '%s'
+    """
+    if IS_POSTGRES:
+        query = query.replace('?', '%s')
+    
+    cursor.execute(query, params)
+    
+    if fetch == 'all':
+        return cursor.fetchall()
+    elif fetch == 'one':
+        return cursor.fetchone()
+    return None
 
 
 def init_db():
     """初始化資料庫表格"""
     with get_db() as conn:
-        cursor = conn.cursor()
+        if IS_POSTGRES:
+            cursor = conn.cursor()
+        else:
+            cursor = conn.cursor()
 
-        # 產品表
-        cursor.execute('''
+        # 產品表 - 注意：PostgreSQL 沒有 TIMESTAMP DEFAULT CURRENT_TIMESTAMP 的寫法，需要改寫
+        auto_inc = "SERIAL" if IS_POSTGRES else "INTEGER AUTOINCREMENT"
+        
+        db_execute(cursor, f'''
             CREATE TABLE IF NOT EXISTS products (
                 id TEXT PRIMARY KEY,
                 sku TEXT,
@@ -64,38 +103,28 @@ def init_db():
                 category_name TEXT,
                 roast TEXT,
                 processing TEXT,
+                purchase_count INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
 
-        # 檢查並新增 roast 與 processing 欄位 (簡單遷移)
-        cursor.execute("PRAGMA table_info(products)")
-        columns = [info[1] for info in cursor.fetchall()]
-
-        if 'roast' not in columns:
-            cursor.execute("ALTER TABLE products ADD COLUMN roast TEXT")
-
-        # 檢查並新增 purchase_count 欄位
-        if 'purchase_count' not in columns:
-            cursor.execute("ALTER TABLE products ADD COLUMN purchase_count INTEGER DEFAULT 0")
-
         # 訂單表
-        cursor.execute('''
+        db_execute(cursor, f'''
             CREATE TABLE IF NOT EXISTS orders (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id {auto_inc} PRIMARY KEY,
                 customer_name TEXT NOT NULL,
                 items_json TEXT NOT NULL,
                 total INTEGER NOT NULL,
-                submitted_to_google BOOLEAN DEFAULT 0,
+                submitted_to_google BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
 
-        # 新增評論資料表
-        cursor.execute('''
+        # 評論資料表
+        db_execute(cursor, f'''
             CREATE TABLE IF NOT EXISTS reviews (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id {auto_inc} PRIMARY KEY,
                 product_id TEXT NOT NULL,
                 reviewer_name TEXT NOT NULL,
                 rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
@@ -105,7 +134,19 @@ def init_db():
             )
         ''')
         
+        # 簡單遷移：針對 SQLite 新增欄位 (PostgreSQL 初次建立就會包含，若要完善需處理 PG 遷移)
+        if not IS_POSTGRES:
+            cursor.execute("PRAGMA table_info(products)")
+            columns = [info[1] for info in cursor.fetchall()]
+
+            if 'roast' not in columns:
+                cursor.execute("ALTER TABLE products ADD COLUMN roast TEXT")
+
+            if 'purchase_count' not in columns:
+                cursor.execute("ALTER TABLE products ADD COLUMN purchase_count INTEGER DEFAULT 0")
+        
         conn.commit()
+        print("資料庫初始化完成")
         print("資料庫初始化完成")
 
 
@@ -115,23 +156,43 @@ def save_products(products: List[Dict]):
         cursor = conn.cursor()
 
         for p in products:
-            cursor.execute('''
-                INSERT INTO products
-                (id, sku, name, price, original_price, image_url, product_url, category, category_name, roast, processing, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(id) DO UPDATE SET
-                    sku=excluded.sku,
-                    name=excluded.name,
-                    price=excluded.price,
-                    original_price=excluded.original_price,
-                    image_url=excluded.image_url,
-                    product_url=excluded.product_url,
-                    category=excluded.category,
-                    category_name=excluded.category_name,
-                    roast=excluded.roast,
-                    processing=excluded.processing,
-                    updated_at=excluded.updated_at
-            ''', (
+            if IS_POSTGRES:
+                query = '''
+                    INSERT INTO products
+                    (id, sku, name, price, original_price, image_url, product_url, category, category_name, roast, processing, updated_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT(id) DO UPDATE SET
+                        sku=EXCLUDED.sku,
+                        name=EXCLUDED.name,
+                        price=EXCLUDED.price,
+                        original_price=EXCLUDED.original_price,
+                        image_url=EXCLUDED.image_url,
+                        product_url=EXCLUDED.product_url,
+                        category=EXCLUDED.category,
+                        category_name=EXCLUDED.category_name,
+                        roast=EXCLUDED.roast,
+                        processing=EXCLUDED.processing,
+                        updated_at=EXCLUDED.updated_at
+                '''
+            else:
+                query = '''
+                    INSERT INTO products
+                    (id, sku, name, price, original_price, image_url, product_url, category, category_name, roast, processing, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(id) DO UPDATE SET
+                        sku=excluded.sku,
+                        name=excluded.name,
+                        price=excluded.price,
+                        original_price=excluded.original_price,
+                        image_url=excluded.image_url,
+                        product_url=excluded.product_url,
+                        category=excluded.category,
+                        category_name=excluded.category_name,
+                        roast=excluded.roast,
+                        processing=excluded.processing,
+                        updated_at=excluded.updated_at
+                '''
+            cursor.execute(query, (
                 p['id'], p['sku'], p['name'], p['price'], p.get('original_price'),
                 p['image_url'], p['product_url'], p['category'], p['category_name'],
                 p.get('roast'), p.get('processing'),
@@ -206,8 +267,9 @@ def get_all_products(category: Optional[str] = None, min_price: Optional[int] = 
         else:
             query += " ORDER BY category, purchase_count DESC, price ASC, name ASC"
 
-        cursor.execute(query, tuple(params))
-        rows = cursor.fetchall()
+        rows = db_execute(cursor, query, tuple(params), fetch='all')
+        if IS_POSTGRES:
+            return [{k: v for k, v in zip([desc[0] for desc in cursor.description], row)} for row in rows]
         return [dict(row) for row in rows]
 
 def get_newest_products(days: int = 7) -> List[Dict]:
@@ -215,27 +277,44 @@ def get_newest_products(days: int = 7) -> List[Dict]:
     with get_db() as conn:
         cursor = conn.cursor()
         
-        query = """
-            SELECT * FROM products
-            WHERE created_at >= datetime('now', ?)
-            ORDER BY purchase_count DESC, created_at DESC, category, name ASC
-        """
-        cursor.execute(query, (f'-{days} days',))
-        
-        rows = cursor.fetchall()
+        if IS_POSTGRES:
+            query = """
+                SELECT * FROM products
+                WHERE created_at >= NOW() - INTERVAL '%s days'
+                ORDER BY purchase_count DESC, created_at DESC, category, name ASC
+            """
+            rows = db_execute(cursor, query, (days,), fetch='all')
+        else:
+            query = """
+                SELECT * FROM products
+                WHERE created_at >= datetime('now', ?)
+                ORDER BY purchase_count DESC, created_at DESC, category, name ASC
+            """
+            rows = db_execute(cursor, query, (f'-{days} days',), fetch='all')
         
         # 如果最近 N 天內沒有任何新品，為了避免頁面空白，
         # 我們退而求其次：找出「最新資料庫中 created_at 最大的那一批」
         if not rows:
-            cursor.execute('''
-                SELECT * FROM products
-                WHERE date(created_at) = (
-                    SELECT date(max(created_at)) FROM products
-                )
-                ORDER BY category, name ASC
-            ''')
-            rows = cursor.fetchall()
+            if IS_POSTGRES:
+                fallback_query = '''
+                    SELECT * FROM products
+                    WHERE DATE(created_at) = (
+                        SELECT DATE(MAX(created_at)) FROM products
+                    )
+                    ORDER BY category, name ASC
+                '''
+            else:
+                fallback_query = '''
+                    SELECT * FROM products
+                    WHERE date(created_at) = (
+                        SELECT date(max(created_at)) FROM products
+                    )
+                    ORDER BY category, name ASC
+                '''
+            rows = db_execute(cursor, fallback_query, fetch='all')
             
+        if IS_POSTGRES:
+            return [{k: v for k, v in zip([desc[0] for desc in cursor.description], row)} for row in rows]
         return [dict(row) for row in rows]
 
 def update_sales_statistics():
@@ -516,19 +595,33 @@ def create_order(customer_name: str, items: List[Dict], total: int) -> int:
     with get_db() as conn:
         cursor = conn.cursor()
         now = get_now_utc8().strftime('%Y-%m-%d %H:%M:%S')
-        cursor.execute('''
-            INSERT INTO orders (customer_name, items_json, total, created_at)
-            VALUES (?, ?, ?, ?)
-        ''', (customer_name, json.dumps(items, ensure_ascii=False), total, now))
         
-        order_id = cursor.lastrowid
+        items_json = json.dumps(items, ensure_ascii=False)
+        
+        if IS_POSTGRES:
+            query = '''
+                INSERT INTO orders (customer_name, items_json, total, created_at)
+                VALUES (%s, %s, %s, %s) RETURNING id
+            '''
+            cursor.execute(query, (customer_name, items_json, total, now))
+            order_id = cursor.fetchone()[0]
+        else:
+            query = '''
+                INSERT INTO orders (customer_name, items_json, total, created_at)
+                VALUES (?, ?, ?, ?)
+            '''
+            cursor.execute(query, (customer_name, items_json, total, now))
+            order_id = cursor.lastrowid
         
         # 即時更新商品的已售出數量
         for item in items:
             name = item.get('name')
             qty = item.get('quantity', 0)
             if name and qty > 0:
-                cursor.execute('UPDATE products SET purchase_count = IFNULL(purchase_count, 0) + ? WHERE name = ?', (qty, name))
+                if IS_POSTGRES:
+                    cursor.execute('UPDATE products SET purchase_count = COALESCE(purchase_count, 0) + %s WHERE name = %s', (qty, name))
+                else:
+                    cursor.execute('UPDATE products SET purchase_count = IFNULL(purchase_count, 0) + ? WHERE name = ?', (qty, name))
         
         conn.commit()
         return order_id
@@ -562,10 +655,16 @@ def mark_order_submitted(order_id: int):
     """標記訂單已提交到 Google"""
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute(
-            'UPDATE orders SET submitted_to_google = 1 WHERE id = ?',
-            (order_id,)
-        )
+        if IS_POSTGRES:
+            cursor.execute(
+                'UPDATE orders SET submitted_to_google = TRUE WHERE id = %s',
+                (order_id,)
+            )
+        else:
+            cursor.execute(
+                'UPDATE orders SET submitted_to_google = 1 WHERE id = ?',
+                (order_id,)
+            )
         conn.commit()
 
 
@@ -882,7 +981,7 @@ def get_orders_by_customer(name: str) -> List[Dict]:
     """根據姓名取得訂單"""
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute(
+        db_execute(cursor, 
             'SELECT * FROM orders WHERE customer_name = ? ORDER BY created_at DESC',
             (name,)
         )
@@ -910,17 +1009,23 @@ def delete_order(order_id: int) -> bool:
     with get_db() as conn:
         cursor = conn.cursor()
         
-        cursor.execute('SELECT items_json FROM orders WHERE id = ?', (order_id,))
+        db_execute(cursor, 'SELECT items_json FROM orders WHERE id = ?', (order_id,))
         row = cursor.fetchone()
         if row:
-            items = json.loads(row['items_json'])
+            items_json = row['items_json'] if not IS_POSTGRES else row[0]
+            if isinstance(row, dict) and 'items_json' in row: items_json = row['items_json']
+            
+            items = json.loads(items_json)
             for item in items:
                 name = item.get('name')
                 qty = item.get('quantity', 0)
                 if name and qty > 0:
-                    cursor.execute('UPDATE products SET purchase_count = MAX(0, IFNULL(purchase_count, 0) - ?) WHERE name = ?', (qty, name))
+                    if IS_POSTGRES:
+                        cursor.execute('UPDATE products SET purchase_count = GREATEST(0, COALESCE(purchase_count, 0) - %s) WHERE name = %s', (qty, name))
+                    else:
+                        cursor.execute('UPDATE products SET purchase_count = MAX(0, IFNULL(purchase_count, 0) - ?) WHERE name = ?', (qty, name))
                     
-        cursor.execute('DELETE FROM orders WHERE id = ?', (order_id,))
+        db_execute(cursor, 'DELETE FROM orders WHERE id = ?', (order_id,))
         conn.commit()
         return cursor.rowcount > 0
 
@@ -931,14 +1036,18 @@ def update_order_item(order_id: int, product_name: str, new_quantity: int) -> bo
         cursor = conn.cursor() # Get cursor from connection
 
         # 先取得目前訂單內容
-        cursor.execute('SELECT items_json, total FROM orders WHERE id = ?', (order_id,))
+        db_execute(cursor, 'SELECT items_json, total FROM orders WHERE id = ?', (order_id,))
         row = cursor.fetchone()
 
         if not row:
             return False
 
-        items = json.loads(row['items_json'])
-        current_total = row['total']
+        items_json = row['items_json'] if not IS_POSTGRES else row[0]
+        if isinstance(row, dict) and 'items_json' in row: items_json = row['items_json']
+        current_total = row['total'] if not IS_POSTGRES else row[1]
+        if isinstance(row, dict) and 'total' in row: current_total = row['total']
+        
+        items = json.loads(items_json)
 
         # 尋找並更新項目
         new_items = []
@@ -960,7 +1069,10 @@ def update_order_item(order_id: int, product_name: str, new_quantity: int) -> bo
                 
                 # 即時更新商品的已售出數量
                 if delta != 0:
-                    cursor.execute('UPDATE products SET purchase_count = MAX(0, IFNULL(purchase_count, 0) + ?) WHERE name = ?', (delta, product_name))
+                    if IS_POSTGRES:
+                        cursor.execute('UPDATE products SET purchase_count = GREATEST(0, COALESCE(purchase_count, 0) + %s) WHERE name = %s', (delta, product_name))
+                    else:
+                        cursor.execute('UPDATE products SET purchase_count = MAX(0, IFNULL(purchase_count, 0) + ?) WHERE name = ?', (delta, product_name))
             else:
                 new_items.append(item)
                 new_total += item['price'] * item['quantity']
@@ -972,9 +1084,9 @@ def update_order_item(order_id: int, product_name: str, new_quantity: int) -> bo
         # 使用者需求是「個別品項刪除」，如果刪光了應該留著空訂單或是刪除訂單
         # 這裡選擇如果沒商品了，就刪除整筆訂單
         if not new_items:
-            cursor.execute('DELETE FROM orders WHERE id = ?', (order_id,))
+            db_execute(cursor, 'DELETE FROM orders WHERE id = ?', (order_id,))
         else:
-            cursor.execute(
+            db_execute(cursor, 
                 'UPDATE orders SET items_json = ?, total = ? WHERE id = ?',
                 (json.dumps(new_items, ensure_ascii=False), new_total, order_id)
             )
@@ -987,68 +1099,126 @@ def update_order_item(order_id: int, product_name: str, new_quantity: int) -> bo
 # 評論相關功能
 # ==========================================
 
-def add_review(product_id: str, reviewer_name: str, rating: int, comment: str) -> int:
-    """新增商品評論"""
+def add_review(product_id: str, reviewer_name: str, rating: int, comment: str = None) -> int:
+    """新增評論"""
     with get_db() as conn:
         cursor = conn.cursor()
         now = get_now_utc8().strftime('%Y-%m-%d %H:%M:%S')
-        cursor.execute('''
-            INSERT INTO reviews (product_id, reviewer_name, rating, comment, created_at)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (product_id, reviewer_name, rating, comment, now))
+        
+        if IS_POSTGRES:
+            query = '''
+                INSERT INTO reviews (product_id, reviewer_name, rating, comment, created_at)
+                VALUES (%s, %s, %s, %s, %s) RETURNING id
+            '''
+            cursor.execute(query, (product_id, reviewer_name, rating, comment, now))
+            review_id = cursor.fetchone()[0]
+        else:
+            query = '''
+                INSERT INTO reviews (product_id, reviewer_name, rating, comment, created_at)
+                VALUES (?, ?, ?, ?, ?)
+            '''
+            cursor.execute(query, (product_id, reviewer_name, rating, comment, now))
+            review_id = cursor.lastrowid
+            
         conn.commit()
-        return cursor.lastrowid
+        return review_id
 
 
 def get_reviews_by_product(product_id: str) -> List[Dict]:
-    """取得單一商品的所有評論"""
+    """取得特定產品的所有評論"""
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute('''
-            SELECT * FROM reviews 
-            WHERE product_id = ? 
+        
+        # 使用 COALESCE 處理可能為 NULL 的 comment 欄位 (確保輸出的 JSON 不會意外變成 null，這邊可以直接用 SQL 處理也可以用 Python 處理)
+        # 這裡為了簡單我們先用 Python 處理
+        db_execute(cursor, '''
+            SELECT id, reviewer_name, rating, comment, created_at
+            FROM reviews
+            WHERE product_id = ?
             ORDER BY created_at DESC
         ''', (product_id,))
+        
         rows = cursor.fetchall()
-        return [dict(row) for row in rows]
+        reviews = []
+        for row in rows:
+            r = dict(row) if not IS_POSTGRES else {k: v for k, v in zip([desc[0] for desc in cursor.description], row)}
+            if r.get('comment') is None:
+                r['comment'] = ""
+            reviews.append(r)
+            
+        return reviews
 
 
 def get_product_review_stats(product_id: str) -> dict:
     """取得單一商品的評論統計(平均星數、評論總數)"""
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute('''
-            SELECT AVG(rating) as avg_rating, COUNT(*) as review_count
-            FROM reviews
-            WHERE product_id = ?
-        ''', (product_id,))
+        if IS_POSTGRES:
+            db_execute(cursor, '''
+                SELECT AVG(rating)::numeric as avg_rating, COUNT(*) as review_count
+                FROM reviews
+                WHERE product_id = %s
+            ''', (product_id,))
+        else:
+            db_execute(cursor, '''
+                SELECT AVG(rating) as avg_rating, COUNT(*) as review_count
+                FROM reviews
+                WHERE product_id = ?
+            ''', (product_id,))
         row = cursor.fetchone()
         
-        avg = row['avg_rating'] if row['avg_rating'] is not None else 0.0
+        avg = row['avg_rating'] if not IS_POSTGRES else (row[0] if row else 0.0)
+        count = row['review_count'] if not IS_POSTGRES else (row[1] if row else 0)
+
+        avg = float(avg) if avg is not None else 0.0
+        count = int(count) if count is not None else 0
         
         return {
             'avg_rating': round(avg, 1),
-            'review_count': row['review_count']
+            'review_count': count
         }
 
 
-def get_all_product_review_stats() -> dict:
-    """取得所有商品的評論統計(避免N+1查詢)"""
+def get_all_product_review_stats() -> Dict[str, Dict]:
+    """
+    取得所有產品的評論統計資料 (平均星數與評論數)
+    Returns:
+        Dict: a mapping from product_id to {'average_rating': float, 'review_count': int}
+    """
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute('''
-            SELECT product_id, AVG(rating) as avg_rating, COUNT(*) as review_count
-            FROM reviews
-            GROUP BY product_id
-        ''')
+        
+        if IS_POSTGRES:
+            cursor.execute('''
+                SELECT product_id, 
+                       ROUND(AVG(rating)::numeric, 1) as avg_rating, 
+                       COUNT(*) as r_count
+                FROM reviews
+                GROUP BY product_id
+            ''')
+        else:
+            cursor.execute('''
+                SELECT product_id, 
+                       ROUND(AVG(rating), 1) as avg_rating, 
+                       COUNT(*) as r_count
+                FROM reviews
+                GROUP BY product_id
+            ''')
+            
         rows = cursor.fetchall()
         
         stats = {}
         for row in rows:
-            stats[row['product_id']] = {
-                'avg_rating': round(row['avg_rating'], 1),
-                'review_count': row['review_count']
+            p_id = row['product_id'] if not IS_POSTGRES else row[0]
+            avg = row['avg_rating'] if not IS_POSTGRES else row[1]
+            cnt = row['r_count'] if not IS_POSTGRES else row[2]
+            
+            # 安全轉換，避免 NoneType 錯誤
+            stats[p_id] = {
+                'average_rating': float(avg) if avg is not None else 0.0,
+                'review_count': int(cnt) if cnt is not None else 0
             }
+            
         return stats
 
 
