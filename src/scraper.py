@@ -9,7 +9,7 @@ import re
 import os
 import time
 import hashlib
-from typing import Optional
+from typing import Optional, List, Tuple
 from dataclasses import dataclass, asdict
 
 import requests
@@ -163,7 +163,7 @@ def extract_processing(name: str) -> Optional[str]:
     return None
 
 
-def scrape_category_page(category_key: str, page: int = 1, limit: int = 24) -> tuple[list[Product], bool]:
+def scrape_category_page(category_key: str, page: int = 1, limit: int = 24) -> Tuple[List[Product], bool]:
     """
     爬取單一分類的單一頁面
 
@@ -277,7 +277,7 @@ def scrape_category_page(category_key: str, page: int = 1, limit: int = 24) -> t
     return products, has_next
 
 
-def scrape_products(category_key: str, max_pages: int = 10) -> list[Product]:
+def scrape_products(category_key: str, max_pages: int = 10) -> List[Product]:
     """
     爬取指定分類的所有產品
 
@@ -312,7 +312,7 @@ def scrape_products(category_key: str, max_pages: int = 10) -> list[Product]:
     return all_products
 
 
-def scrape_all_products() -> list[Product]:
+def scrape_all_products() -> List[Product]:
     """爬取所有分類的產品"""
     all_products = []
 
@@ -324,7 +324,7 @@ def scrape_all_products() -> list[Product]:
     return all_products
 
 
-def save_products_json(products: list[Product], filepath: str = "data/products.json"):
+def save_products_json(products: List[Product], filepath: str = "data/products.json"):
     """將產品資料儲存為 JSON 檔案"""
     import os
     os.makedirs(os.path.dirname(filepath), exist_ok=True)

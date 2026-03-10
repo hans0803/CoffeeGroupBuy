@@ -8,7 +8,7 @@ import sqlite3
 import json
 import os
 from datetime import datetime, timezone, timedelta
-from typing import Optional
+from typing import Optional, List, Dict, Tuple
 from contextlib import contextmanager
 from collections import defaultdict
 from openpyxl import Workbook
@@ -109,7 +109,7 @@ def init_db():
         print("資料庫初始化完成")
 
 
-def save_products(products: list[dict]):
+def save_products(products: List[Dict]):
     """儲存產品到資料庫（更新或插入，並保留商品建立時間）"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -163,7 +163,7 @@ ROAST_GROUPS = {
 }
 
 def get_all_products(category: Optional[str] = None, min_price: Optional[int] = None, max_price: Optional[int] = None,
-                    roast: Optional[str] = None, processing: Optional[str] = None) -> list[dict]:
+                    roast: Optional[str] = None, processing: Optional[str] = None) -> List[Dict]:
     """取得所有產品 (支援分類、價格、烘焙度、處理法篩選)"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -210,7 +210,7 @@ def get_all_products(category: Optional[str] = None, min_price: Optional[int] = 
         rows = cursor.fetchall()
         return [dict(row) for row in rows]
 
-def get_newest_products(days: int = 7) -> list[dict]:
+def get_newest_products(days: int = 7) -> List[Dict]:
     """取得最近 N 天內首次建立的產品 (即本次新品)"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -326,7 +326,7 @@ def update_sales_statistics():
         print(f"已更新銷售統計，寫入 {json_path}")
 
 
-def get_common_prices(category: Optional[str] = None, limit: int = 12) -> list[int]:
+def get_common_prices(category: Optional[str] = None, limit: int = 12) -> List[int]:
     """取得該分類下常見的價格 (用於快速篩選)"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -484,7 +484,7 @@ def get_product_by_id(product_id: str) -> Optional[dict]:
         return dict(row) if row else None
 
 
-def get_products_by_ids(product_ids: list[str]) -> list[dict]:
+def get_products_by_ids(product_ids: List[str]) -> List[Dict]:
     """根據多個 ID 取得產品"""
     if not product_ids:
         return []
@@ -497,7 +497,7 @@ def get_products_by_ids(product_ids: list[str]) -> list[dict]:
         return [dict(row) for row in rows]
 
 
-def get_categories() -> list[dict]:
+def get_categories() -> List[Dict]:
     """取得所有分類及其產品數量"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -511,7 +511,7 @@ def get_categories() -> list[dict]:
         return [dict(row) for row in rows]
 
 
-def create_order(customer_name: str, items: list[dict], total: int) -> int:
+def create_order(customer_name: str, items: List[Dict], total: int) -> int:
     """建立新訂單"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -534,7 +534,7 @@ def create_order(customer_name: str, items: list[dict], total: int) -> int:
         return order_id
 
 
-def get_all_orders() -> list[dict]:
+def get_all_orders() -> List[Dict]:
     """取得所有訂單"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -688,7 +688,7 @@ def clear_orders() -> int:
         return count
 
 
-def export_orders() -> tuple[str, str]:
+def export_orders() -> Tuple[str, str]:
     """
     匯出訂單到兩個 Excel 檔案
 
@@ -858,7 +858,7 @@ def export_orders() -> tuple[str, str]:
     return vendor_path, internal_path
 
 
-def group_orders_by_customer(orders: list[dict]) -> dict:
+def group_orders_by_customer(orders: List[Dict]) -> dict:
     """
     將訂單按客戶姓名分組
     """
@@ -878,7 +878,7 @@ def group_orders_by_customer(orders: list[dict]) -> dict:
     return grouped
 
 
-def get_orders_by_customer(name: str) -> list[dict]:
+def get_orders_by_customer(name: str) -> List[Dict]:
     """根據姓名取得訂單"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -897,7 +897,7 @@ def get_orders_by_customer(name: str) -> list[dict]:
         return orders
 
 
-def get_all_customer_names() -> list[str]:
+def get_all_customer_names() -> List[str]:
     """取得所有已下單的客戶姓名"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1000,7 +1000,7 @@ def add_review(product_id: str, reviewer_name: str, rating: int, comment: str) -
         return cursor.lastrowid
 
 
-def get_reviews_by_product(product_id: str) -> list[dict]:
+def get_reviews_by_product(product_id: str) -> List[Dict]:
     """取得單一商品的所有評論"""
     with get_db() as conn:
         cursor = conn.cursor()

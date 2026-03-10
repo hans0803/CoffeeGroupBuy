@@ -8,7 +8,7 @@ import os
 import json
 import requests
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Dict, Tuple
 
 # Google Apps Script Web App URL (使用者需自行設定)
 GOOGLE_SCRIPT_URL = os.environ.get('GOOGLE_SCRIPT_URL', '')
@@ -16,9 +16,9 @@ GOOGLE_SCRIPT_URL = os.environ.get('GOOGLE_SCRIPT_URL', '')
 
 def submit_order_to_google(
     customer_name: str,
-    items: list[dict],
+    items: List[Dict],
     total: int
-) -> tuple[bool, str]:
+) -> Tuple[bool, str]:
     """
     將訂單提交到 Google 表單
     
