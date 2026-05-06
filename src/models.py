@@ -237,6 +237,18 @@ ROAST_GROUPS = {
     }
 }
 
+ROAST_ORDER = ['淺中', '中焙', '中深', '深焙', '其他']
+
+
+def classify_roast(r_val: Optional[str]) -> Optional[str]:
+    """將原始烘焙度字串映射為標準分組標籤；空值回傳 None。"""
+    if not r_val:
+        return None
+    for group in ROAST_GROUPS.values():
+        if r_val in group['values']:
+            return group['label']
+    return '其他'
+
 def get_all_products(category: Optional[str] = None, min_price: Optional[int] = None, max_price: Optional[int] = None,
                     roast: Optional[str] = None, processing: Optional[str] = None) -> List[Dict]:
     """取得所有產品 (支援分類、價格、烘焙度、處理法篩選)"""
@@ -377,29 +389,15 @@ def get_sales_statistics_dict() -> dict:
         # B. Roast Stats (based on purchase_count, filtered by drip)
         roast_rows = db_execute(cursor, "SELECT roast, purchase_count FROM products WHERE purchase_count > 0 AND category = 'drip'", fetch='all')
 
-        # 簡單映射烘焙度 (Align with ROAST_GROUPS)
         roast_counts = defaultdict(int)
-
         for row in roast_rows:
             d = row_to_dict(cursor, row)
-            r_val = d.get('roast')
-            count = d.get('purchase_count', 0)
-            label = "其他"
-            if not r_val:
-                label = "未分類"
-            else:
-                if '黃金' in r_val or '淺' in r_val:
-                    label = "淺中"  # Light
-                elif '白金' in r_val or '中' in r_val and '深' not in r_val:
-                    label = "中焙"  # Medium
-                elif '中深' in r_val:
-                    label = "中深"  # Medium-Dark
-                elif '深' in r_val and '中' not in r_val:
-                    label = "深焙"  # Dark
+            label = classify_roast(d.get('roast'))
+            if label is None:
+                continue
+            roast_counts[label] += d.get('purchase_count', 0)
 
-            roast_counts[label] += count
-
-        stats["roast_stats"] = dict(roast_counts)
+        stats["roast_stats"] = {l: roast_counts[l] for l in ROAST_ORDER if roast_counts.get(l)}
 
         # C. Price Stats (Exact Price Points, filtered by drip)
         price_rows = db_execute(cursor, "SELECT price, purchase_count FROM products WHERE purchase_count > 0 AND category = 'drip'", fetch='all')
@@ -530,23 +528,11 @@ def get_current_sales_statistics() -> dict:
     roast_counts = defaultdict(int)
     for name, count in product_counts.items():
         p_info = product_info_map.get(name)
-        r_val = p_info.get('roast') if p_info else None
-
-        label = "其他"
-        if not r_val:
-            label = "未分類"
-        else:
-            if '黃金' in r_val or '淺' in r_val:
-                label = "淺中"
-            elif '白金' in r_val or '中' in r_val and '深' not in r_val:
-                label = "中焙"
-            elif '中深' in r_val:
-                label = "中深"
-            elif '深' in r_val and '中' not in r_val:
-                label = "深焙"
-
+        label = classify_roast(p_info.get('roast') if p_info else None)
+        if label is None:
+            continue
         roast_counts[label] += count
-    stats["roast_stats"] = dict(roast_counts)
+    stats["roast_stats"] = {l: roast_counts[l] for l in ROAST_ORDER if roast_counts.get(l)}
 
     # 3. Price Stats (Exact)
     price_exact = defaultdict(int)

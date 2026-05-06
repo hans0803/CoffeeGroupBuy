@@ -86,19 +86,21 @@
 
     // 1. Roast Chart (Pie)
     const ctxRoast = document.getElementById('roastChart').getContext('2d');
+    const roastColors = {
+        '淺中': '#d4a373',
+        '中焙': '#a98467',
+        '中深': '#6f4e37',
+        '深焙': '#2f1b0c',
+        '其他': '#999999'
+    };
+    const roastLabels = Object.keys(roastStats);
     new Chart(ctxRoast, {
         type: 'doughnut',
         data: {
-            labels: Object.keys(roastStats),
+            labels: roastLabels,
             datasets: [{
                 data: Object.values(roastStats),
-                backgroundColor: [
-                    '#d4a373', // 淺/黃金
-                    '#a98467', // 中
-                    '#6f4e37', // 中深
-                    '#2f1b0c', // 深
-                    '#999999'  // 其他
-                ],
+                backgroundColor: roastLabels.map(l => roastColors[l] || '#cccccc'),
                 borderWidth: 0
             }]
         },
